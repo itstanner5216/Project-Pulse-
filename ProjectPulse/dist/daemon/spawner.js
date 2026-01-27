@@ -43,6 +43,7 @@ exports.spawnAgent = spawnAgent;
 const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
 const fs_1 = require("fs");
+const fsSync = __importStar(require("fs"));
 const types_1 = require("../lib/delegation/types");
 // ============================================================================
 // CLI Configurations
@@ -112,13 +113,75 @@ async function detectCli() {
     return null;
 }
 /**
+ * Validate and sanitize a working directory path.
+ *
+ * @param dir - The working directory path to validate
+ * @returns The absolute, validated path
+ * @throws Error if the path is invalid, doesn't exist, isn't a directory, or is in a restricted location
+ */
+function validateWorkingDir(dir) {
+    // Resolve to absolute path
+    const absPath = path.resolve(dir);
+    // Prevent execution in sensitive system directories (check before existence)
+    // This is intentional - we want to reject sensitive paths even if they don't exist
+    const sensitiveDirs = process.platform === 'win32'
+        ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
+        : ['/root', '/etc', '/sys', '/proc', '/dev'];
+    for (const sensitiveDir of sensitiveDirs) {
+        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+            throw new Error(`Working directory is in restricted path: ${dir}`);
+        }
+    }
+    // Check if path exists
+    let stats;
+    try {
+        // Use lstat to check symlink itself, not target
+        stats = fsSync.lstatSync(absPath);
+    }
+    catch (error) {
+        throw new Error(`Working directory does not exist: ${dir}`);
+    }
+    // For symlinks, also validate the real path
+    if (stats.isSymbolicLink()) {
+        try {
+            const realPath = fsSync.realpathSync(absPath);
+            // Check if real path is in sensitive directory
+            for (const sensitiveDir of sensitiveDirs) {
+                if (realPath === sensitiveDir || realPath.startsWith(sensitiveDir + path.sep)) {
+                    throw new Error(`Working directory symlink points to restricted path: ${dir}`);
+                }
+            }
+            // Check if real path is a directory
+            const realStats = fsSync.statSync(realPath);
+            if (!realStats.isDirectory()) {
+                throw new Error(`Working directory is not a directory: ${dir}`);
+            }
+        }
+        catch (error) {
+            if (error instanceof Error && error.message.includes('restricted path')) {
+                throw error;
+            }
+            throw new Error(`Working directory symlink is broken: ${dir}`);
+        }
+    }
+    else {
+        // Verify it's a directory
+        if (!stats.isDirectory()) {
+            throw new Error(`Working directory is not a directory: ${dir}`);
+        }
+    }
+    return absPath;
+}
+/**
  * Load agent prompt content from agentprompts/ directory.
  */
 async function loadAgentPrompt(agent, workingDir) {
+    // Validate working directory before using it
+    const validWorkingDir = validateWorkingDir(workingDir);
     // Look for agentprompts/ in the project root
     const possiblePaths = [
-        path.join(workingDir, 'agentprompts', types_1.AGENT_FILES[agent]),
-        path.join(workingDir, '..', 'agentprompts', types_1.AGENT_FILES[agent]),
+        path.join(validWorkingDir, 'agentprompts', types_1.AGENT_FILES[agent]),
+        path.join(validWorkingDir, '..', 'agentprompts', types_1.AGENT_FILES[agent]),
         path.join(process.cwd(), 'agentprompts', types_1.AGENT_FILES[agent]),
     ];
     for (const agentPath of possiblePaths) {
@@ -144,6 +207,19 @@ async function loadAgentPrompt(agent, workingDir) {
  * @returns The spawn result with stdout, stderr, exitCode
  */
 async function spawnAgent(request, timeoutMs) {
+    // Validate working directory before using it
+    let validWorkingDir;
+    try {
+        validWorkingDir = validateWorkingDir(request.workingDir);
+    }
+    catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Invalid working directory',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
     // Determine which CLI to use
     let cli;
     if (request.targetCli === 'auto') {
@@ -180,7 +256,7 @@ async function spawnAgent(request, timeoutMs) {
         let timedOut = false;
         let finished = false;
         const proc = (0, child_process_1.spawn)(config.command, args, {
-            cwd: request.workingDir,
+            cwd: validWorkingDir,
             env: {
                 ...process.env,
                 // Inject ProjectPulse session ID for tracking
