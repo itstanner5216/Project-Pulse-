@@ -284,5 +284,5 @@ For general questions about security, you can:
 
 ---
 
-**Last Updated:** 2026-01-27  
+**Last Updated:** 2025-01-27  
 **Next Review:** After v0.1.1 release
