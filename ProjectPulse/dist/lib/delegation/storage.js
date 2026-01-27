@@ -115,11 +115,15 @@ async function ensureDirs() {
 // ============================================================================
 /**
  * Create a new delegation request and write it to the pending directory.
+ *
+ * Uses generateUniqueId() which appends a timestamp to ensure uniqueness
+ * and prevent ID collisions. ID format: adjective-color-animal-timestamp
+ * (e.g., "swift-amber-falcon-1706345678901")
  */
 async function createRequest(request) {
     try {
         await ensureDirs();
-        const id = (0, id_1.generateId)();
+        const id = (0, id_1.generateUniqueId)();
         const fullRequest = {
             ...request,
             id,

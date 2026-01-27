@@ -59,15 +59,26 @@ function generateId() {
 }
 /**
  * Validate that a string looks like a valid delegation ID.
+ *
+ * Accepts both standard format (adjective-color-animal) and
+ * unique format with timestamp (adjective-color-animal-timestamp).
  */
 function isValidId(id) {
     const parts = id.split('-');
-    if (parts.length !== 3)
+    // Standard format: adjective-color-animal (3 parts)
+    // Unique format: adjective-color-animal-timestamp (4 parts)
+    if (parts.length !== 3 && parts.length !== 4)
         return false;
     const [adj, color, animal] = parts;
-    return (ADJECTIVES.includes(adj) &&
+    const isStandardFormat = (ADJECTIVES.includes(adj) &&
         COLORS.includes(color) &&
         ANIMALS.includes(animal));
+    // If 4 parts, validate timestamp (should be numeric)
+    if (parts.length === 4) {
+        const timestamp = parts[3];
+        return isStandardFormat && /^\d+$/.test(timestamp);
+    }
+    return isStandardFormat;
 }
 /**
  * Generate a unique ID with a timestamp suffix for guaranteed uniqueness.

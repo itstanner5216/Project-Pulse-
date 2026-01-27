@@ -16,6 +16,9 @@
 export declare function generateId(): string;
 /**
  * Validate that a string looks like a valid delegation ID.
+ *
+ * Accepts both standard format (adjective-color-animal) and
+ * unique format with timestamp (adjective-color-animal-timestamp).
  */
 export declare function isValidId(id: string): boolean;
 /**

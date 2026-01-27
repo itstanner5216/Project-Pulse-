@@ -31,6 +31,10 @@ export declare function getResultPath(id: string): string;
 export declare function ensureDirs(): Promise<void>;
 /**
  * Create a new delegation request and write it to the pending directory.
+ *
+ * Uses generateUniqueId() which appends a timestamp to ensure uniqueness
+ * and prevent ID collisions. ID format: adjective-color-animal-timestamp
+ * (e.g., "swift-amber-falcon-1706345678901")
  */
 export declare function createRequest(request: Omit<DelegationRequest, 'id' | 'status' | 'createdAt'>): Promise<DelegationEnvelope<{
     id: string;
