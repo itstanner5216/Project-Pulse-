@@ -105,13 +105,51 @@ async function detectCli(): Promise<Exclude<SupportedCli, 'auto'> | null> {
 }
 
 /**
+ * Validate and sanitize a working directory path.
+ * 
+ * @param dir - The working directory path to validate
+ * @returns The absolute, validated path
+ * @throws Error if the path is invalid, doesn't exist, isn't a directory, or is in a restricted location
+ */
+function validateWorkingDir(dir: string): string {
+    // Resolve to absolute path
+    const absPath = path.resolve(dir);
+    
+    // Prevent execution in sensitive system directories (check before existence)
+    const sensitiveDirs = ['/root', '/etc', '/sys', '/proc', '/dev'];
+    for (const sensitiveDir of sensitiveDirs) {
+        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+            throw new Error(`Working directory is in restricted path: ${dir}`);
+        }
+    }
+    
+    // Check if path exists
+    let stats;
+    try {
+        stats = require('fs').statSync(absPath);
+    } catch (error) {
+        throw new Error(`Working directory does not exist: ${dir}`);
+    }
+    
+    // Verify it's a directory
+    if (!stats.isDirectory()) {
+        throw new Error(`Working directory is not a directory: ${dir}`);
+    }
+    
+    return absPath;
+}
+
+/**
  * Load agent prompt content from agentprompts/ directory.
  */
 async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<string> {
+    // Validate working directory before using it
+    const validWorkingDir = validateWorkingDir(workingDir);
+    
     // Look for agentprompts/ in the project root
     const possiblePaths = [
-        path.join(workingDir, 'agentprompts', AGENT_FILES[agent]),
-        path.join(workingDir, '..', 'agentprompts', AGENT_FILES[agent]),
+        path.join(validWorkingDir, 'agentprompts', AGENT_FILES[agent]),
+        path.join(validWorkingDir, '..', 'agentprompts', AGENT_FILES[agent]),
         path.join(process.cwd(), 'agentprompts', AGENT_FILES[agent]),
     ];
 
@@ -143,6 +181,19 @@ export async function spawnAgent(
     request: DelegationRequest,
     timeoutMs: number
 ): Promise<SpawnResult> {
+    // Validate working directory before using it
+    let validWorkingDir: string;
+    try {
+        validWorkingDir = validateWorkingDir(request.workingDir);
+    } catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Invalid working directory',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
+    
     // Determine which CLI to use
     let cli: Exclude<SupportedCli, 'auto'>;
 
@@ -183,7 +234,7 @@ export async function spawnAgent(
         let finished = false;
 
         const proc: ChildProcess = spawn(config.command, args, {
-            cwd: request.workingDir,
+            cwd: validWorkingDir,
             env: {
                 ...process.env,
                 // Inject ProjectPulse session ID for tracking
