@@ -1,0 +1,81 @@
+"use strict";
+/**
+ * Readable ID generator for delegations.
+ *
+ * Generates memorable IDs in the format: adjective-color-animal
+ * (e.g., "swift-amber-falcon", "bold-coral-panther")
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateId = generateId;
+exports.isValidId = isValidId;
+exports.generateUniqueId = generateUniqueId;
+// ============================================================================
+// Word Lists
+// ============================================================================
+const ADJECTIVES = [
+    'swift', 'bold', 'calm', 'dark', 'eager', 'fair', 'glad', 'hale',
+    'keen', 'loud', 'meek', 'neat', 'odd', 'pale', 'quick', 'rare',
+    'safe', 'tall', 'vast', 'warm', 'wild', 'wise', 'young', 'zesty',
+    'brave', 'crisp', 'deft', 'fresh', 'grand', 'hardy', 'jolly', 'lucky',
+    'merry', 'noble', 'proud', 'royal', 'sharp', 'stark', 'tight', 'vivid',
+];
+const COLORS = [
+    'amber', 'azure', 'beige', 'black', 'blush', 'brass', 'brick', 'bronze',
+    'brown', 'coral', 'cream', 'crimson', 'cyan', 'denim', 'ebony', 'fawn',
+    'frost', 'gold', 'grape', 'green', 'grey', 'ivory', 'jade', 'lemon',
+    'lilac', 'lime', 'mauve', 'mint', 'navy', 'olive', 'onyx', 'peach',
+    'pearl', 'pink', 'plum', 'rose', 'ruby', 'rust', 'sage', 'sand',
+    'scarlet', 'silver', 'slate', 'steel', 'stone', 'tan', 'teal', 'violet',
+];
+const ANIMALS = [
+    'ant', 'bat', 'bear', 'bee', 'bird', 'boar', 'cat', 'crab',
+    'crow', 'deer', 'dog', 'dove', 'duck', 'eagle', 'elk', 'falcon',
+    'fish', 'frog', 'goat', 'goose', 'hawk', 'heron', 'horse', 'hound',
+    'jay', 'lark', 'lion', 'lynx', 'mice', 'mole', 'moth', 'newt',
+    'owl', 'ox', 'panda', 'panther', 'pike', 'puma', 'rat', 'raven',
+    'seal', 'shark', 'sheep', 'snake', 'spider', 'squid', 'stag', 'swan',
+    'tiger', 'toad', 'trout', 'viper', 'whale', 'wolf', 'wren', 'zebra',
+];
+// ============================================================================
+// ID Generator
+// ============================================================================
+/**
+ * Pick a random element from an array.
+ */
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+/**
+ * Generate a readable delegation ID.
+ *
+ * Format: adjective-color-animal
+ * Example: "swift-amber-falcon"
+ *
+ * Collision probability is low for typical use cases:
+ * ~40 × ~48 × ~56 = ~107,520 combinations
+ */
+function generateId() {
+    return `${pick(ADJECTIVES)}-${pick(COLORS)}-${pick(ANIMALS)}`;
+}
+/**
+ * Validate that a string looks like a valid delegation ID.
+ */
+function isValidId(id) {
+    const parts = id.split('-');
+    if (parts.length !== 3)
+        return false;
+    const [adj, color, animal] = parts;
+    return (ADJECTIVES.includes(adj) &&
+        COLORS.includes(color) &&
+        ANIMALS.includes(animal));
+}
+/**
+ * Generate a unique ID with a timestamp suffix for guaranteed uniqueness.
+ *
+ * Format: adjective-color-animal-timestamp
+ * Example: "swift-amber-falcon-1706345678901"
+ */
+function generateUniqueId() {
+    return `${generateId()}-${Date.now()}`;
+}
+//# sourceMappingURL=id.js.map
