@@ -83,7 +83,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#3-race-condition-in-daemon-start"
           - "FOLLOWUP_TASKS.md#task-3-fix-daemon-race-condition-on-start"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Modify writePid() to use fs.open() with 'wx' flag (exclusive create)"
           - "Return boolean indicating success/failure"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 13
+    todo: 12
     doing: 0
-    done: 1
+    done: 2
     blocked: 0
 
 # Workflow notes

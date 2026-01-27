@@ -52,10 +52,36 @@ async function log(message: string): Promise<void> {
 // PID Management
 // ============================================================================
 
-async function writePid(): Promise<void> {
+/**
+ * Atomically write the PID file to claim daemon ownership.
+ * 
+ * Uses the 'wx' flag for exclusive file creation, which provides atomic
+ * locking semantics. If multiple processes try to start the daemon
+ * simultaneously, only one will succeed in creating the PID file.
+ * 
+ * @returns true if PID file was successfully created (daemon claimed),
+ *          false if PID file already exists (another daemon is running)
+ * @throws Error for unexpected filesystem errors (not EEXIST)
+ */
+async function writePid(): Promise<boolean> {
     const pidPath = getPidPath();
     await fs.mkdir(path.dirname(pidPath), { recursive: true });
-    await fs.writeFile(pidPath, String(process.pid));
+    
+    try {
+        // Use 'wx' flag for exclusive create - fails if file exists
+        // This provides atomic test-and-set semantics
+        const handle = await fs.open(pidPath, 'wx');
+        await handle.writeFile(String(process.pid));
+        await handle.close();
+        return true; // Successfully claimed daemon ownership
+    } catch (error) {
+        // Check if file already exists (another daemon is running)
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+            return false; // Already claimed by another process
+        }
+        // Re-throw unexpected errors
+        throw error;
+    }
 }
 
 async function readPid(): Promise<number | null> {
@@ -101,15 +127,21 @@ let watcher: DelegationWatcher | null = null;
 
 /**
  * Start the daemon.
+ * 
+ * Uses atomic PID file creation to prevent race conditions when multiple
+ * processes try to start the daemon simultaneously.
  */
 export async function startDaemon(): Promise<void> {
-    if (await isRunning()) {
+    await log('Daemon starting...');
+    
+    // Atomically claim daemon ownership via PID file
+    // This replaces the race-prone isRunning() check
+    const claimed = await writePid();
+    
+    if (!claimed) {
         console.log('Daemon is already running');
         return;
     }
-
-    await log('Daemon starting...');
-    await writePid();
 
     watcher = new DelegationWatcher({
         onPickup: (request) => {

@@ -15,6 +15,9 @@
 export declare function isRunning(): Promise<boolean>;
 /**
  * Start the daemon.
+ *
+ * Uses atomic PID file creation to prevent race conditions when multiple
+ * processes try to start the daemon simultaneously.
  */
 export declare function startDaemon(): Promise<void>;
 /**
