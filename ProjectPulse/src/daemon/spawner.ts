@@ -8,6 +8,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType } from '../lib/delegation/types';
 
 // ============================================================================
@@ -116,7 +117,11 @@ function validateWorkingDir(dir: string): string {
     const absPath = path.resolve(dir);
     
     // Prevent execution in sensitive system directories (check before existence)
-    const sensitiveDirs = ['/root', '/etc', '/sys', '/proc', '/dev'];
+    // This is intentional - we want to reject sensitive paths even if they don't exist
+    const sensitiveDirs = process.platform === 'win32'
+        ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
+        : ['/root', '/etc', '/sys', '/proc', '/dev'];
+    
     for (const sensitiveDir of sensitiveDirs) {
         if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
@@ -126,14 +131,38 @@ function validateWorkingDir(dir: string): string {
     // Check if path exists
     let stats;
     try {
-        stats = require('fs').statSync(absPath);
+        // Use lstat to check symlink itself, not target
+        stats = fsSync.lstatSync(absPath);
     } catch (error) {
         throw new Error(`Working directory does not exist: ${dir}`);
     }
     
-    // Verify it's a directory
-    if (!stats.isDirectory()) {
-        throw new Error(`Working directory is not a directory: ${dir}`);
+    // For symlinks, also validate the real path
+    if (stats.isSymbolicLink()) {
+        try {
+            const realPath = fsSync.realpathSync(absPath);
+            // Check if real path is in sensitive directory
+            for (const sensitiveDir of sensitiveDirs) {
+                if (realPath === sensitiveDir || realPath.startsWith(sensitiveDir + path.sep)) {
+                    throw new Error(`Working directory symlink points to restricted path: ${dir}`);
+                }
+            }
+            // Check if real path is a directory
+            const realStats = fsSync.statSync(realPath);
+            if (!realStats.isDirectory()) {
+                throw new Error(`Working directory is not a directory: ${dir}`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('restricted path')) {
+                throw error;
+            }
+            throw new Error(`Working directory symlink is broken: ${dir}`);
+        }
+    } else {
+        // Verify it's a directory
+        if (!stats.isDirectory()) {
+            throw new Error(`Working directory is not a directory: ${dir}`);
+        }
     }
     
     return absPath;
