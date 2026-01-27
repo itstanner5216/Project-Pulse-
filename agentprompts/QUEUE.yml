@@ -385,7 +385,7 @@ phases:
 # Summary statistics
 summary:
   total_tasks: 14
-  phases: 8
+  phases: 9
   estimated_total_hours: 38
   status_counts:
     todo: 14
