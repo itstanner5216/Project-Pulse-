@@ -261,6 +261,7 @@ export async function spawnAgent(
         let stderr = '';
         let timedOut = false;
         let finished = false;
+        let forceKillHandle: NodeJS.Timeout | null = null;
 
         const proc: ChildProcess = spawn(config.command, args, {
             cwd: validWorkingDir,
@@ -293,7 +294,7 @@ export async function spawnAgent(
                 proc.kill('SIGTERM');
 
                 // Force kill after 5 seconds
-                setTimeout(() => {
+                forceKillHandle = setTimeout(() => {
                     if (!finished) {
                         proc.kill('SIGKILL');
                     }
@@ -305,6 +306,9 @@ export async function spawnAgent(
         proc.on('close', (code) => {
             finished = true;
             clearTimeout(timeoutHandle);
+            if (forceKillHandle) {
+                clearTimeout(forceKillHandle);
+            }
 
             resolve({
                 stdout,
@@ -317,6 +321,9 @@ export async function spawnAgent(
         proc.on('error', (err) => {
             finished = true;
             clearTimeout(timeoutHandle);
+            if (forceKillHandle) {
+                clearTimeout(forceKillHandle);
+            }
 
             resolve({
                 stdout,
