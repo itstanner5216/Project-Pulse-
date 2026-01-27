@@ -1,0 +1,8 @@
+{
+  "track_id": "project-pulse-mvp-cli_20260126",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-26T16:47:20Z",
+  "updated_at": "2026-01-26T16:47:20Z",
+  "description": "MVP CLI — Deterministic context pack + search + Merkle change detection (with guardrails, JSON+text output, and cloud-ready retrieval hooks)"
+}

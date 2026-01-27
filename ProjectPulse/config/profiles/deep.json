@@ -1,0 +1,19 @@
+{
+  "context": {
+    "max_files": 50,
+    "max_bytes": 131072,
+    "max_lines": 2000,
+    "focus": "auto"
+  },
+  "pulse": {
+    "analysis_hours": 720,
+    "large_file_kb": 250
+  },
+  "recent": {
+    "hours": 168
+  },
+  "search": {
+    "context_lines": 5,
+    "max_results": 200
+  }
+}
