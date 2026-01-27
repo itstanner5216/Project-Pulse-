@@ -132,8 +132,6 @@ let watcher: DelegationWatcher | null = null;
  * processes try to start the daemon simultaneously.
  */
 export async function startDaemon(): Promise<void> {
-    await log('Daemon starting...');
-    
     // Atomically claim daemon ownership via PID file
     // This replaces the race-prone isRunning() check
     const claimed = await writePid();
@@ -143,12 +141,16 @@ export async function startDaemon(): Promise<void> {
         return;
     }
 
-    watcher = new DelegationWatcher({
-        onPickup: (request) => {
-            log(`Picked up: ${request.id} (agent: ${request.agent})`);
-        },
-        onComplete: (result) => {
-            log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
+    // Successfully claimed - log after claiming to avoid misleading log entries
+    await log('Daemon starting...');
+
+    try {
+        watcher = new DelegationWatcher({
+            onPickup: (request) => {
+                log(`Picked up: ${request.id} (agent: ${request.agent})`);
+            },
+            onComplete: (result) => {
+                log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
         },
         onError: (error, id) => {
             log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
@@ -172,6 +174,12 @@ export async function startDaemon(): Promise<void> {
 
     console.log(`Delegation daemon started (PID: ${process.pid})`);
     console.log(`Log file: ${getLogPath()}`);
+    } catch (error) {
+        // Clean up PID file if initialization fails
+        await removePid();
+        await log(`Daemon failed to start: ${error}`);
+        throw error;
+    }
 }
 
 /**

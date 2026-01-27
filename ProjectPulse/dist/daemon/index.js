@@ -159,7 +159,6 @@ let watcher = null;
  * processes try to start the daemon simultaneously.
  */
 async function startDaemon() {
-    await log('Daemon starting...');
     // Atomically claim daemon ownership via PID file
     // This replaces the race-prone isRunning() check
     const claimed = await writePid();
@@ -167,31 +166,41 @@ async function startDaemon() {
         console.log('Daemon is already running');
         return;
     }
-    watcher = new watcher_1.DelegationWatcher({
-        onPickup: (request) => {
-            log(`Picked up: ${request.id} (agent: ${request.agent})`);
-        },
-        onComplete: (result) => {
-            log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
-        },
-        onError: (error, id) => {
-            log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
-        },
-    });
-    // Handle shutdown signals
-    const shutdown = async () => {
-        await log('Daemon shutting down...');
-        watcher?.stop();
+    // Successfully claimed - log after claiming to avoid misleading log entries
+    await log('Daemon starting...');
+    try {
+        watcher = new watcher_1.DelegationWatcher({
+            onPickup: (request) => {
+                log(`Picked up: ${request.id} (agent: ${request.agent})`);
+            },
+            onComplete: (result) => {
+                log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
+            },
+            onError: (error, id) => {
+                log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
+            },
+        });
+        // Handle shutdown signals
+        const shutdown = async () => {
+            await log('Daemon shutting down...');
+            watcher?.stop();
+            await removePid();
+            process.exit(0);
+        };
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+        process.on('SIGHUP', shutdown);
+        await watcher.start();
+        await log('Daemon started, watching for delegations');
+        console.log(`Delegation daemon started (PID: ${process.pid})`);
+        console.log(`Log file: ${getLogPath()}`);
+    }
+    catch (error) {
+        // Clean up PID file if initialization fails
         await removePid();
-        process.exit(0);
-    };
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
-    process.on('SIGHUP', shutdown);
-    await watcher.start();
-    await log('Daemon started, watching for delegations');
-    console.log(`Delegation daemon started (PID: ${process.pid})`);
-    console.log(`Log file: ${getLogPath()}`);
+        await log(`Daemon failed to start: ${error}`);
+        throw error;
+    }
 }
 /**
  * Stop the daemon.
