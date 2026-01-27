@@ -111,7 +111,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#4-unhandled-force-kill-timer-leak"
           - "FOLLOWUP_TASKS.md#task-4-clear-force-kill-timer-on-process-exit"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Add variable to store force-kill timer handle"
           - "Clear force-kill timer in process 'close' handler"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 13
+    todo: 12
     doing: 0
-    done: 1
+    done: 2
     blocked: 0
 
 # Workflow notes
