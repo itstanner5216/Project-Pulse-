@@ -48,9 +48,22 @@ class DelegationWatcher {
                 }
             });
             this.watcher.on('error', (err) => {
-                this.options.onError(err);
+                // Close and clean up the broken watcher before falling back
+                // Do this BEFORE calling onError callback to ensure cleanup happens
+                // even if the callback throws
+                if (this.watcher) {
+                    try {
+                        this.watcher.close();
+                    }
+                    catch {
+                        // Ignore close errors - watcher may already be in error state
+                    }
+                    this.watcher = null;
+                }
                 // Fall back to polling on watch error
                 this.startPolling();
+                // Call error callback last, so cleanup happens even if it throws
+                this.options.onError(err);
             });
         }
         catch {
