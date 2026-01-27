@@ -1,0 +1,606 @@
+#!/usr/bin/env bash
+#===============================================================================
+# ProjectPulse v4.0.0-phase2 Main CLI Dispatcher
+# Unified entrypoint: inject, sync, file, config, search/symbols/merkle proxies
+#
+# Interface:
+#   projectpulse <command> [args]
+#
+# Commands:
+#   inject                          Once-per-session briefing injection
+#   sync [--budget-seconds N] [--status]  Incremental cloud sync
+#   search [options...]             Proxy to hooks/search.sh
+#   symbols [options...]            Proxy to hooks/symbols.sh
+#   merkle [root|snapshot|changes]  Proxy to pulse/merkle.sh
+#   file head <path> [--lines N]
+#   file show <path> [--range A-B]
+#   file grep <pattern> <path> [--fixed|--regex]
+#   config print
+#===============================================================================
+
+set -euo pipefail
+
+# Resolve script location and project structure
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+LIB_DIR="${PROJECT_DIR}/lib"
+HOOKS_DIR="${PROJECT_DIR}/hooks"
+PULSE_DIR="${PROJECT_DIR}/pulse"
+
+# Source core library
+if [[ -f "${LIB_DIR}/core.sh" ]]; then
+    # shellcheck source=lib/core.sh
+    source "${LIB_DIR}/core.sh"
+else
+    printf '{"ok":false,"error":"core.sh not found","code":1}\n' >&2
+    exit 1
+fi
+
+#===============================================================================
+# Configuration & Defaults
+#===============================================================================
+
+# Session defaults
+: "${PROJECTPULSE_SESSION_ID:=}"
+: "${PROJECTPULSE_ROOT:=.}"
+
+# Brief cache TTL (3 days)
+BRIEF_CACHE_TTL=259200
+
+# Sentinel TTL (24 hours)
+SENTINEL_TTL=86400
+
+# File output caps
+MAX_FILE_LINES=500
+MAX_FILE_BYTES=51200
+
+# Banner text (exact, printed only when injection occurs)
+INJECT_BANNER='Context pack (compressed): This is a high level project summary. Not a verbatim dump. Use file paths as pointers and review exact file contents for verbatim code when needed.'
+
+#===============================================================================
+# Initialization
+#===============================================================================
+
+init_environment() {
+    # Normalize PROJECTPULSE_ROOT to absolute path
+    if [[ "$PROJECTPULSE_ROOT" == "." ]]; then
+        PROJECTPULSE_ROOT="$(pwd)"
+    else
+        PROJECTPULSE_ROOT="$(cd "$PROJECTPULSE_ROOT" 2>/dev/null && pwd)" || {
+            json_err "invalid PROJECTPULSE_ROOT: $PROJECTPULSE_ROOT" 1
+            return 1
+        }
+    fi
+    export PROJECTPULSE_ROOT
+    
+    # Set ProjectPulse_Root for core.sh compatibility
+    ProjectPulse_Root="$PROJECTPULSE_ROOT"
+    export ProjectPulse_Root
+    
+    # Generate session ID if not set
+    if [[ -z "$PROJECTPULSE_SESSION_ID" ]]; then
+        PROJECTPULSE_SESSION_ID=$(generate_session_id)
+    fi
+    export PROJECTPULSE_SESSION_ID
+    
+    # Load ignore patterns
+    load_ignore_patterns
+}
+
+#===============================================================================
+# Command: inject
+#===============================================================================
+
+cmd_inject() {
+    local proj_id idx_ver sentinel_key
+    
+    # Get project identity
+    proj_id=$(project_id)
+    idx_ver=$(index_version)
+    
+    # Build sentinel key: per (project_id, session_id)
+    sentinel_key="injected:${proj_id}:${PROJECTPULSE_SESSION_ID}"
+    
+    # Check if already injected this session
+    if injected_check "$proj_id" "$PROJECTPULSE_SESSION_ID"; then
+        # Silent no-op on subsequent calls
+        exit 0
+    fi
+    
+    # Print banner (injection is happening)
+    printf '%s\n' "$INJECT_BANNER"
+    
+    # Generate local briefing pack
+    local local_pack
+    if [[ -x "${HOOKS_DIR}/projectpulse.sh" ]]; then
+        local_pack=$("${HOOKS_DIR}/projectpulse.sh" 2>/dev/null) || local_pack='{"error":"pack_generation_failed"}'
+    else
+        local_pack='{"error":"projectpulse.sh not found"}'
+    fi
+    
+    # Extract data from json_ok wrapper if present
+    if [[ "$local_pack" == *'"ok":true'* ]]; then
+        # Extract the data field using bash (no jq dependency)
+        local_pack=$(extract_json_data "$local_pack")
+    fi
+    
+    # Try cloud enrichment if configured
+    local final_pack="$local_pack"
+    if google_configured; then
+        if [[ -x "${HOOKS_DIR}/google-query.sh" ]]; then
+            local enriched
+            enriched=$("${HOOKS_DIR}/google-query.sh" inject "$local_pack" 2>/dev/null) || true
+            if [[ -n "$enriched" && "$enriched" != *'"error"'* ]]; then
+                final_pack="$enriched"
+            fi
+        fi
+    fi
+    
+    # Cache the briefing
+    local brief_key="brief:${proj_id}:${idx_ver}"
+    local cache_dir="${ProjectPulse_Root}/.ProjectPulse/cache"
+    
+    if has_command redis-cli; then
+        cache_set "$brief_key" "$BRIEF_CACHE_TTL" "$final_pack" 2>/dev/null || true
+    else
+        mkdir -p "$cache_dir"
+        local cache_file="${cache_dir}/brief_${idx_ver}.json"
+        local expiry=$(($(date +%s) + BRIEF_CACHE_TTL))
+        printf '%d\n%s' "$expiry" "$final_pack" > "$cache_file" 2>/dev/null || true
+    fi
+    
+    # Mark as injected
+    injected_mark "$proj_id" "$PROJECTPULSE_SESSION_ID"
+    
+    # Output the briefing pack (single line JSON)
+    printf '%s\n' "$final_pack"
+}
+
+#===============================================================================
+# Command: file
+#===============================================================================
+
+cmd_file() {
+    local subcmd="${1:-}"
+    shift || true
+    
+    case "$subcmd" in
+        head)
+            cmd_file_head "$@"
+            ;;
+        show)
+            cmd_file_show "$@"
+            ;;
+        grep)
+            cmd_file_grep "$@"
+            ;;
+        *)
+            json_err "unknown file subcommand: ${subcmd:-<none>}. Use: head, show, grep" 1
+            ;;
+    esac
+}
+
+cmd_file_head() {
+    local filepath=""
+    local lines=20
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --lines|-n)
+                lines="${2:-20}"
+                shift 2
+                ;;
+            -*)
+                json_err "unknown option: $1" 1
+                return 1
+                ;;
+            *)
+                filepath="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ -z "$filepath" ]]; then
+        json_err "file path required" 1
+        return 1
+    fi
+    
+    # Validate and resolve path
+    local abs_path
+    abs_path=$(realpath_safe "$filepath") || return $?
+    
+    if [[ ! -f "$abs_path" ]]; then
+        json_err "file not found: $filepath" 1
+        return 1
+    fi
+    
+    # Cap lines
+    if [[ "$lines" -gt "$MAX_FILE_LINES" ]]; then
+        lines="$MAX_FILE_LINES"
+    fi
+    
+    # Get relative path
+    local relpath
+    relpath=$(rel_path "$abs_path")
+    
+    # Read content with cap
+    local content
+    content=$(head -n "$lines" "$abs_path" 2>/dev/null | head -c "$MAX_FILE_BYTES")
+    
+    # Build JSON response
+    local data
+    data=$(printf '{"path":"%s","content":"%s","lines":%d}' \
+        "$(json_escape "$relpath")" \
+        "$(json_escape "$content")" \
+        "$lines")
+    
+    json_ok "$data"
+}
+
+cmd_file_show() {
+    local filepath=""
+    local range_start=1
+    local range_end=-1
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --range)
+                local range_spec="${2:-1-}"
+                if [[ "$range_spec" =~ ^([0-9]+)-([0-9]*)$ ]]; then
+                    range_start="${BASH_REMATCH[1]}"
+                    range_end="${BASH_REMATCH[2]:-0}"
+                    [[ -z "$range_end" || "$range_end" == "0" ]] && range_end=-1
+                else
+                    json_err "invalid range format. Use: A-B or A-" 1
+                    return 1
+                fi
+                shift 2
+                ;;
+            -*)
+                json_err "unknown option: $1" 1
+                return 1
+                ;;
+            *)
+                filepath="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ -z "$filepath" ]]; then
+        json_err "file path required" 1
+        return 1
+    fi
+    
+    # Validate and resolve path
+    local abs_path
+    abs_path=$(realpath_safe "$filepath") || return $?
+    
+    if [[ ! -f "$abs_path" ]]; then
+        json_err "file not found: $filepath" 1
+        return 1
+    fi
+    
+    local relpath
+    relpath=$(rel_path "$abs_path")
+    
+    # Read content with range
+    local content total_lines
+    total_lines=$(wc -l < "$abs_path" 2>/dev/null || echo 0)
+    
+    if [[ "$range_end" -eq -1 ]]; then
+        range_end="$total_lines"
+    fi
+    
+    # Cap range
+    local line_count=$((range_end - range_start + 1))
+    if [[ "$line_count" -gt "$MAX_FILE_LINES" ]]; then
+        range_end=$((range_start + MAX_FILE_LINES - 1))
+    fi
+    
+    content=$(sed -n "${range_start},${range_end}p" "$abs_path" 2>/dev/null | head -c "$MAX_FILE_BYTES")
+    
+    local data
+    data=$(printf '{"path":"%s","content":"%s","range":{"start":%d,"end":%d}}' \
+        "$(json_escape "$relpath")" \
+        "$(json_escape "$content")" \
+        "$range_start" \
+        "$range_end")
+    
+    json_ok "$data"
+}
+
+cmd_file_grep() {
+    local pattern=""
+    local filepath=""
+    local fixed_mode=0
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --fixed|-F)
+                fixed_mode=1
+                shift
+                ;;
+            --regex|-E)
+                fixed_mode=0
+                shift
+                ;;
+            -*)
+                json_err "unknown option: $1" 1
+                return 1
+                ;;
+            *)
+                if [[ -z "$pattern" ]]; then
+                    pattern="$1"
+                elif [[ -z "$filepath" ]]; then
+                    filepath="$1"
+                else
+                    json_err "unexpected argument: $1" 1
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ -z "$pattern" ]]; then
+        json_err "pattern required" 1
+        return 1
+    fi
+    
+    if [[ -z "$filepath" ]]; then
+        json_err "file path required" 1
+        return 1
+    fi
+    
+    # Validate and resolve path
+    local abs_path
+    abs_path=$(realpath_safe "$filepath") || return $?
+    
+    if [[ ! -f "$abs_path" ]]; then
+        json_err "file not found: $filepath" 1
+        return 1
+    fi
+    
+    local relpath
+    relpath=$(rel_path "$abs_path")
+    
+    # Build grep command
+    local grep_args=("-n")
+    if [[ "$fixed_mode" -eq 1 ]]; then
+        grep_args+=("-F")
+    fi
+    
+    # Execute grep and collect matches
+    local matches_json="["
+    local match_count=0
+    local first=1
+    local max_matches=$((MAX_FILE_LINES / 2))
+    
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        [[ "$match_count" -ge "$max_matches" ]] && break
+        
+        local linenum="${line%%:*}"
+        local text="${line#*:}"
+        
+        # Validate linenum is numeric
+        if ! [[ "$linenum" =~ ^[0-9]+$ ]]; then
+            continue
+        fi
+        
+        [[ "$first" -eq 0 ]] && matches_json+=","
+        matches_json+=$(printf '{"line":%d,"text":"%s"}' "$linenum" "$(json_escape "$text")")
+        first=0
+        ((match_count++)) || true
+    done < <(grep "${grep_args[@]}" -- "$pattern" "$abs_path" 2>/dev/null || true)
+    
+    matches_json+="]"
+    
+    local data
+    data=$(printf '{"path":"%s","matches":%s,"count":%d}' \
+        "$(json_escape "$relpath")" \
+        "$matches_json" \
+        "$match_count")
+    
+    json_ok "$data"
+}
+
+#===============================================================================
+# Command: config
+#===============================================================================
+
+cmd_config() {
+    local subcmd="${1:-}"
+    
+    case "$subcmd" in
+        print)
+            cmd_config_print
+            ;;
+        *)
+            json_err "unknown config subcommand: ${subcmd:-<none>}. Use: print" 1
+            ;;
+    esac
+}
+
+cmd_config_print() {
+    local proj_id idx_ver
+    proj_id=$(project_id)
+    idx_ver=$(index_version)
+    
+    local redis_avail="false"
+    has_command redis-cli && redis_avail="true"
+    
+    local google_conf="false"
+    google_configured && google_conf="true"
+    
+    # Build ignore patterns array
+    load_ignore_patterns
+    local ignore_json="["
+    local first=1
+    for pattern in "${_ProjectPulse_IGNORE_PATTERNS[@]}"; do
+        [[ "$first" -eq 0 ]] && ignore_json+=","
+        ignore_json+="\"$(json_escape "$pattern")\""
+        first=0
+    done
+    ignore_json+="]"
+    
+    local data
+    data=$(printf '{"root":"%s","project_id":"%s","index_version":"%s","session_id":"%s","redis_available":%s,"google_configured":%s,"ignore_patterns":%s}' \
+        "$(json_escape "$ProjectPulse_Root")" \
+        "$(json_escape "$proj_id")" \
+        "$(json_escape "$idx_ver")" \
+        "$(json_escape "$PROJECTPULSE_SESSION_ID")" \
+        "$redis_avail" \
+        "$google_conf" \
+        "$ignore_json")
+    
+    json_ok "$data"
+}
+
+#===============================================================================
+# Command: sync
+#===============================================================================
+
+cmd_sync() {
+    if [[ -x "${HOOKS_DIR}/google-sync.sh" ]]; then
+        exec "${HOOKS_DIR}/google-sync.sh" "$@"
+    else
+        json_err "google-sync.sh not found or not executable" 1
+    fi
+}
+
+#===============================================================================
+# Proxy Commands
+#===============================================================================
+
+cmd_search() {
+    if [[ -x "${PULSE_DIR}/search.sh" ]]; then
+        exec "${PULSE_DIR}/search.sh" "$@"
+    else
+        json_err "search.sh not found" 1
+    fi
+}
+
+cmd_symbols() {
+    if [[ -x "${PULSE_DIR}/symbols.sh" ]]; then
+        exec "${PULSE_DIR}/symbols.sh" "$@"
+    else
+        json_err "symbols.sh not found" 1
+    fi
+}
+
+cmd_merkle() {
+    if [[ -x "${PULSE_DIR}/merkle.sh" ]]; then
+        exec "${PULSE_DIR}/merkle.sh" "$@"
+    else
+        json_err "merkle.sh not found" 1
+    fi
+}
+
+#===============================================================================
+# Helper Functions
+#===============================================================================
+
+# Extract JSON data field (simple bash extraction for json_ok wrapper)
+extract_json_data() {
+    local json="$1"
+    # Try to extract the "data": value
+    # This is a simple extraction - works for our json_ok format
+    if [[ "$json" =~ \"data\":(.+)$ ]]; then
+        local data_part="${BASH_REMATCH[1]}"
+        # Remove trailing }
+        data_part="${data_part%\}}"
+        printf '%s' "$data_part"
+    else
+        printf '%s' "$json"
+    fi
+}
+
+#===============================================================================
+# Main Entry Point
+#===============================================================================
+
+show_help() {
+    cat <<EOF
+ProjectPulse v4.0.0-phase2 - Intelligent Project Context System
+
+Usage: projectpulse <command> [options]
+
+Commands:
+  inject                          Generate and inject session briefing (once per session)
+  sync [--budget-seconds N] [--status]  Incremental sync to cloud
+  search [query] [options]        Search project content
+  symbols [file] [options]        Extract code symbols
+  merkle [root|snapshot|changes]  Merkle tree operations
+  file head <path> [--lines N]    Show first N lines of file
+  file show <path> [--range A-B]  Show lines A through B
+  file grep <pattern> <path>      Search within file
+  config print                    Print current configuration
+
+Environment Variables:
+  PROJECTPULSE_ROOT              Project root directory (default: .)
+  PROJECTPULSE_SESSION_ID        Unique session identifier
+
+Examples:
+  projectpulse inject
+  projectpulse file head src/main.py --lines 50
+  projectpulse file grep "TODO" src/app.js
+  projectpulse config print
+EOF
+}
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+    
+    # Handle help
+    case "$cmd" in
+        --help|-h|help)
+            show_help
+            exit 0
+            ;;
+        --version|-v)
+            printf 'ProjectPulse v4.0.0-phase2\n'
+            exit 0
+            ;;
+    esac
+    
+    # Initialize environment
+    init_environment || exit $?
+    
+    # Route command
+    case "$cmd" in
+        inject)
+            cmd_inject "$@"
+            ;;
+        file)
+            cmd_file "$@"
+            ;;
+        config)
+            cmd_config "$@"
+            ;;
+        sync)
+            cmd_sync "$@"
+            ;;
+        search)
+            cmd_search "$@"
+            ;;
+        symbols)
+            cmd_symbols "$@"
+            ;;
+        merkle)
+            cmd_merkle "$@"
+            ;;
+        "")
+            json_err "command required. Use --help for usage." 1
+            ;;
+        *)
+            json_err "unknown command: $cmd. Use --help for usage." 1
+            ;;
+    esac
+}
+
+# Run main
+main "$@"

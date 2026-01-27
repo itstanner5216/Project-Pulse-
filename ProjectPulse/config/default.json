@@ -1,0 +1,25 @@
+{
+  "context": {
+    "max_files": 20,
+    "max_bytes": 65536,
+    "max_lines": 500,
+    "focus": "auto"
+  },
+  "pulse": {
+    "analysis_hours": 168,
+    "large_file_kb": 500
+  },
+  "recent": {
+    "hours": 24
+  },
+  "search": {
+    "context_lines": 2,
+    "max_results": 100,
+    "include_globs": [],
+    "exclude_globs": []
+  },
+  "markers": [
+    "package.json", "pyproject.toml", "Cargo.toml", "go.mod",
+    "Makefile", "docker-compose.yml", ".env", ".ProjectPulse.json"
+  ]
+}
