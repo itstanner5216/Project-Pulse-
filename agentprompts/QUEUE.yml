@@ -59,7 +59,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#2-id-collision-vulnerability-in-request-creation"
           - "FOLLOWUP_TASKS.md#task-2-fix-id-collision-in-delegation-requests"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Update createRequest() to use generateUniqueId() instead of generateId()"
           - "OR implement collision detection with atomic file creation (wx flag)"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 13
+    todo: 12
     doing: 0
-    done: 1
+    done: 2
     blocked: 0
 
 # Workflow notes
