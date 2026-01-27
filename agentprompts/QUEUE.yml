@@ -31,7 +31,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#1-missing-validation-of-workingdir-path"
           - "FOLLOWUP_TASKS.md#task-1-add-workingdir-path-validation"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Create a validateWorkingDir() function that resolves path to absolute form"
           - "Verify path exists and is a directory"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 14
+    todo: 13
     doing: 0
-    done: 0
+    done: 1
     blocked: 0
 
 # Workflow notes
