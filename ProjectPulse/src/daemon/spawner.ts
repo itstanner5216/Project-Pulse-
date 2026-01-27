@@ -9,7 +9,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import * as fsSync from 'fs';
-import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType } from '../lib/delegation/types';
+import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType, isValidAgentType } from '../lib/delegation/types';
 
 // ============================================================================
 // Types
@@ -170,8 +170,19 @@ function validateWorkingDir(dir: string): string {
 
 /**
  * Load agent prompt content from agentprompts/ directory.
+ * 
+ * @param agent - The agent type to load
+ * @param workingDir - The working directory to search for agent prompts
+ * @returns The agent prompt content
+ * @throws Error if agent type is invalid or working directory is invalid
  */
 async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<string> {
+    // Validate agent type before attempting to load files
+    if (!isValidAgentType(agent)) {
+        const validTypes = Object.keys(AGENT_FILES).join(', ');
+        throw new Error(`Invalid agent type: "${agent}". Valid agent types are: ${validTypes}`);
+    }
+    
     // Validate working directory before using it
     const validWorkingDir = validateWorkingDir(workingDir);
     
@@ -210,6 +221,17 @@ export async function spawnAgent(
     request: DelegationRequest,
     timeoutMs: number
 ): Promise<SpawnResult> {
+    // Validate agent type first (before any other operations)
+    if (!isValidAgentType(request.agent)) {
+        const validTypes = Object.keys(AGENT_FILES).join(', ');
+        return {
+            stdout: '',
+            stderr: `Invalid agent type: "${request.agent}". Valid agent types are: ${validTypes}`,
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
+    
     // Validate working directory before using it
     let validWorkingDir: string;
     try {
@@ -250,7 +272,17 @@ export async function spawnAgent(
     }
 
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    let agentContent: string;
+    try {
+        agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    } catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Failed to load agent prompt',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
 
     // Build command
     const config = CLI_CONFIGS[cli];

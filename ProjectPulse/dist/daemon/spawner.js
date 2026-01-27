@@ -174,8 +174,18 @@ function validateWorkingDir(dir) {
 }
 /**
  * Load agent prompt content from agentprompts/ directory.
+ *
+ * @param agent - The agent type to load
+ * @param workingDir - The working directory to search for agent prompts
+ * @returns The agent prompt content
+ * @throws Error if agent type is invalid or working directory is invalid
  */
 async function loadAgentPrompt(agent, workingDir) {
+    // Validate agent type before attempting to load files
+    if (!(0, types_1.isValidAgentType)(agent)) {
+        const validTypes = Object.keys(types_1.AGENT_FILES).join(', ');
+        throw new Error(`Invalid agent type: "${agent}". Valid agent types are: ${validTypes}`);
+    }
     // Validate working directory before using it
     const validWorkingDir = validateWorkingDir(workingDir);
     // Look for agentprompts/ in the project root
@@ -207,6 +217,16 @@ async function loadAgentPrompt(agent, workingDir) {
  * @returns The spawn result with stdout, stderr, exitCode
  */
 async function spawnAgent(request, timeoutMs) {
+    // Validate agent type first (before any other operations)
+    if (!(0, types_1.isValidAgentType)(request.agent)) {
+        const validTypes = Object.keys(types_1.AGENT_FILES).join(', ');
+        return {
+            stdout: '',
+            stderr: `Invalid agent type: "${request.agent}". Valid agent types are: ${validTypes}`,
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
     // Validate working directory before using it
     let validWorkingDir;
     try {
@@ -246,7 +266,18 @@ async function spawnAgent(request, timeoutMs) {
         }
     }
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    let agentContent;
+    try {
+        agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    }
+    catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Failed to load agent prompt',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
     // Build command
     const config = CLI_CONFIGS[cli];
     const args = config.args(request.prompt, agentContent);

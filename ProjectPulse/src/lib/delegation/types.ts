@@ -50,6 +50,23 @@ export const AGENT_FILES: Record<AgentType, string> = {
 };
 
 /**
+ * Type guard to check if a value is a valid AgentType.
+ * 
+ * @param value - The value to check
+ * @returns True if the value is a valid agent type, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * if (isValidAgentType('explorer')) {
+ *   // value is guaranteed to be AgentType
+ * }
+ * ```
+ */
+export function isValidAgentType(value: string): value is AgentType {
+    return value in AGENT_FILES;
+}
+
+/**
  * Optional YAML frontmatter that can be added to agent markdown files.
  */
 export interface AgentFrontmatter {

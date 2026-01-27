@@ -245,3 +245,168 @@ describe('spawner - loadAgentPrompt validation', () => {
         expect(result.stderr).toMatch(/Working directory does not exist/);
     });
 });
+
+describe('spawner - agent type validation', () => {
+    let tempDir: string;
+    let testRequest: DelegationRequest;
+
+    beforeEach(() => {
+        // Create a temporary directory for tests
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-agent-test-'));
+        
+        // Create a basic delegation request with valid workingDir
+        testRequest = {
+            id: 'test-agent-validation',
+            parentSession: 'test-session',
+            sourceCli: 'auto',
+            targetCli: 'auto',
+            agent: 'explorer', // Will be overridden in tests
+            prompt: 'test prompt',
+            status: 'pending',
+            workingDir: tempDir,
+            createdAt: new Date().toISOString(),
+            timeout: 60,
+        };
+    });
+
+    afterEach(() => {
+        // Clean up temporary directory
+        if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    describe('valid agent types', () => {
+        const validAgentTypes: Array<DelegationRequest['agent']> = [
+            'explorer',
+            'reviewer',
+            'performance',
+            'architect',
+            'planner',
+        ];
+
+        validAgentTypes.forEach((agentType) => {
+            it(`should accept valid agent type: ${agentType}`, async () => {
+                testRequest.agent = agentType;
+                const result = await spawnAgent(testRequest, 5000);
+                
+                // Should not fail with agent validation error
+                expect(result.stderr).not.toMatch(/Invalid agent type/);
+                expect(result.stderr).not.toMatch(/Valid agent types are/);
+            });
+        });
+    });
+
+    describe('invalid agent types', () => {
+        it('should reject invalid agent type with descriptive error', async () => {
+            // Force an invalid agent type by casting
+            testRequest.agent = 'invalid-agent' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            // Should fail with agent validation error
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "invalid-agent"/);
+            expect(result.stderr).toMatch(/Valid agent types are:/);
+        });
+
+        it('should list all valid agent types in error message', async () => {
+            testRequest.agent = 'nonexistent' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            // Should list all valid types
+            expect(result.stderr).toMatch(/explorer/);
+            expect(result.stderr).toMatch(/reviewer/);
+            expect(result.stderr).toMatch(/performance/);
+            expect(result.stderr).toMatch(/architect/);
+            expect(result.stderr).toMatch(/planner/);
+        });
+
+        it('should reject empty string as agent type', async () => {
+            testRequest.agent = '' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+
+        it('should reject null as agent type', async () => {
+            testRequest.agent = null as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+
+        it('should reject undefined as agent type', async () => {
+            testRequest.agent = undefined as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+
+        it('should reject agent type with wrong casing', async () => {
+            testRequest.agent = 'Explorer' as any; // Capital E
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "Explorer"/);
+        });
+
+        it('should reject agent type with extra whitespace', async () => {
+            testRequest.agent = ' explorer ' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+
+        it('should reject agent type that looks similar to valid type', async () => {
+            testRequest.agent = 'explorers' as any; // Plural form
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "explorers"/);
+        });
+
+        it('should reject special characters as agent type', async () => {
+            testRequest.agent = '../../../etc/passwd' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+
+        it('should reject numeric values as agent type', async () => {
+            testRequest.agent = 123 as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type/);
+        });
+    });
+
+    describe('error message format', () => {
+        it('should provide clear error message with both invalid type and valid options', async () => {
+            testRequest.agent = 'unknown-type' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            // Verify error message structure
+            expect(result.stderr).toMatch(/Invalid agent type: "unknown-type"\. Valid agent types are: .+/);
+        });
+
+        it('should format valid types as comma-separated list', async () => {
+            testRequest.agent = 'badtype' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            // Should have commas between valid types
+            const match = result.stderr.match(/Valid agent types are: ([^.]+)/);
+            expect(match).toBeTruthy();
+            if (match) {
+                const validTypesList = match[1];
+                expect(validTypesList).toMatch(/,/); // Contains commas
+                expect(validTypesList.split(',').length).toBe(5); // Has 5 types
+            }
+        });
+    });
+});
