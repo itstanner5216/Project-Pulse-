@@ -1,0 +1,34 @@
+{
+    "name": "projectpulse",
+    "version": "0.1.0",
+    "description": "IDE-like project awareness for AI agents",
+    "main": "dist/index.js",
+    "bin": {
+        "projectpulse": "dist/index.js",
+        "pulse-agents": "dist/daemon/index.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "lint": "eslint src/**/*.ts",
+        "test": "vitest",
+        "clean": "rm -rf dist"
+    },
+    "keywords": [
+        "ai",
+        "agents",
+        "cli",
+        "context",
+        "codebase"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "typescript": "^5.0.0",
+        "vitest": "^1.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
