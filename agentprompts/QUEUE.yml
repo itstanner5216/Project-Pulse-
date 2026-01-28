@@ -236,7 +236,7 @@ phases:
           Create integration tests for end-to-end delegation workflow and daemon lifecycle.
         source_refs:
           - "FOLLOWUP_TASKS.md#task-11-add-integration-tests"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Test end-to-end delegation workflow (create → process → read result)"
           - "Test daemon lifecycle (start → process requests → stop)"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 12
+    todo: 11
     doing: 0
-    done: 2
+    done: 3
     blocked: 0
 
 # Workflow notes
