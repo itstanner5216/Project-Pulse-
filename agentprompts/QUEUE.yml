@@ -263,7 +263,7 @@ phases:
           and enforce coding standards.
         source_refs:
           - "FOLLOWUP_TASKS.md#task-9-add-eslint-security-rules"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Add eslint-plugin-security to dependencies"
           - "Configure no-eval, no-implied-eval, no-new-func rules"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 11
+    todo: 7
     doing: 0
-    done: 3
+    done: 7
     blocked: 0
 
 # Workflow notes

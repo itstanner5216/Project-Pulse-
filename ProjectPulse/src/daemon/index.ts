@@ -120,7 +120,10 @@ export async function isRunning(): Promise<boolean> {
 let watcher: DelegationWatcher | null = null;
 
 /**
- * Start the daemon.
+ * Start the delegation daemon if it is not already running.
+ *
+ * Creates and writes the daemon PID file, instantiates and starts a DelegationWatcher
+ * with logging callbacks, and registers signal handlers to perform a graceful shutdown.
  */
 export async function startDaemon(): Promise<void> {
     if (await isRunning()) {
@@ -133,13 +136,13 @@ export async function startDaemon(): Promise<void> {
 
     watcher = new DelegationWatcher({
         onPickup: (request) => {
-            log(`Picked up: ${request.id} (agent: ${request.agent})`);
+            void log(`Picked up: ${request.id} (agent: ${request.agent})`);
         },
         onComplete: (result) => {
-            log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
+            void log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
         },
         onError: (error, id) => {
-            log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
+            void log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
         },
     });
 
@@ -151,9 +154,9 @@ export async function startDaemon(): Promise<void> {
         process.exit(0);
     };
 
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
-    process.on('SIGHUP', shutdown);
+    process.on('SIGTERM', () => void shutdown());
+    process.on('SIGINT', () => void shutdown());
+    process.on('SIGHUP', () => void shutdown());
 
     await watcher.start();
     await log('Daemon started, watching for delegations');
