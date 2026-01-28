@@ -365,7 +365,7 @@ phases:
           opportunities.
         source_refs:
           - "FOLLOWUP_TASKS.md#task-13-add-performance-tests"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Measure ID generation performance (collision rate)"
           - "Measure context pack generation time"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 7
+    todo: 6
     doing: 0
-    done: 7
+    done: 8
     blocked: 0
 
 # Workflow notes
