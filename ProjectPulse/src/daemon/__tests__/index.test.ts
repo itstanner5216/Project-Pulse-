@@ -512,11 +512,13 @@ describe('daemon - concurrent start attempts', () => {
             // Attempt to create with wx flag should succeed
             const fd = fs.openSync(pidPath, 'wx');
             fs.writeSync(fd, '22222');
+            
+            // Read using file descriptor to avoid TOCTOU race condition
+            const buffer = Buffer.alloc(5);
+            fs.readSync(fd, buffer, 0, 5, 0);
             fs.closeSync(fd);
             
-            // Read file once to avoid race condition (don't check existence separately)
-            const pidContent = fs.readFileSync(pidPath, 'utf-8');
-            expect(pidContent).toBe('22222');
+            expect(buffer.toString('utf-8')).toBe('22222');
         });
 
         it('should handle EEXIST error correctly', async () => {
