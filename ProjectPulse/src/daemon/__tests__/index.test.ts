@@ -193,8 +193,8 @@ describe('daemon - process existence check', () => {
             fs.mkdirSync(path.dirname(pidPath), { recursive: true });
             
             // Make directory read-only to cause permission error
-            // (skip on Windows where this doesn't work the same way)
-            if (process.platform !== 'win32') {
+            // Skip on Windows or when running as root (common in CI)
+            if (process.platform !== 'win32' && process.getuid?.() !== 0) {
                 fs.chmodSync(path.dirname(pidPath), 0o000);
                 
                 const running = await isRunning();
@@ -547,8 +547,8 @@ describe('daemon - concurrent start attempts', () => {
         });
 
         it('should handle permission errors', async () => {
-            // Skip on Windows where permissions work differently
-            if (process.platform === 'win32') {
+            // Skip on Windows or when running as root (common in CI)
+            if (process.platform === 'win32' || process.getuid?.() === 0) {
                 return;
             }
             

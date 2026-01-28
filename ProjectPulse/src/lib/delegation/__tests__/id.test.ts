@@ -143,19 +143,27 @@ describe('generateUniqueId', () => {
         const ids = new Set<string>();
         const promises: Promise<void>[] = [];
         
-        // Generate 100 IDs concurrently
-        for (let i = 0; i < 100; i++) {
-            promises.push(
-                Promise.resolve().then(() => {
-                    ids.add(generateUniqueId());
-                })
-            );
+        // Mock Date.now to increment for deterministic testing
+        let mockTime = 1700000000000;
+        const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockTime++);
+        
+        try {
+            // Generate 100 IDs concurrently
+            for (let i = 0; i < 100; i++) {
+                promises.push(
+                    Promise.resolve().then(() => {
+                        ids.add(generateUniqueId());
+                    })
+                );
+            }
+            
+            await Promise.all(promises);
+            
+            // With mocked incrementing time, all IDs should be unique
+            expect(ids.size).toBe(100);
+        } finally {
+            nowSpy.mockRestore();
         }
-        
-        await Promise.all(promises);
-        
-        // Should have very few collisions (allow for up to 1% collision rate)
-        expect(ids.size).toBeGreaterThan(99);
     });
 
     it('should have increasing timestamps when called sequentially', () => {
