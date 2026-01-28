@@ -8,6 +8,14 @@ import * as path from 'path';
 import * as os from 'os';
 import { DelegationWatcher, WatcherOptions } from '../watcher';
 
+vi.mock('../spawner', () => ({
+    spawnAgent: vi.fn().mockResolvedValue({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        timedOut: false,
+    }),
+}));
 describe('DelegationWatcher - error handling and cleanup', () => {
     let tempDir: string;
     let pendingDir: string;
