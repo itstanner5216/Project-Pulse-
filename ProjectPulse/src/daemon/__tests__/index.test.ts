@@ -509,8 +509,8 @@ describe('daemon - concurrent start attempts', () => {
             const { pidPath } = getPaths(tempDir);
             fs.mkdirSync(path.dirname(pidPath), { recursive: true });
             
-            // Attempt to create with wx flag should succeed
-            const fd = fs.openSync(pidPath, 'wx');
+            // Use wx+ flag to open for both writing and reading
+            const fd = fs.openSync(pidPath, 'wx+');
             fs.writeSync(fd, '22222');
             
             // Read using file descriptor to avoid TOCTOU race condition
