@@ -22,7 +22,7 @@ import {
     err,
     DelegationEnvelope,
 } from './types';
-import { generateId } from './id';
+import { generateUniqueId } from './id';
 
 // ============================================================================
 // Path Helpers
@@ -89,6 +89,10 @@ export async function ensureDirs(): Promise<void> {
 
 /**
  * Create a new delegation request and write it to the pending directory.
+ * 
+ * Uses generateUniqueId() which appends a timestamp to ensure uniqueness
+ * and prevent ID collisions. ID format: adjective-color-animal-timestamp
+ * (e.g., "swift-amber-falcon-1706345678901")
  */
 export async function createRequest(
     request: Omit<DelegationRequest, 'id' | 'status' | 'createdAt'>
@@ -96,7 +100,7 @@ export async function createRequest(
     try {
         await ensureDirs();
 
-        const id = generateId();
+        const id = generateUniqueId();
         const fullRequest: DelegationRequest = {
             ...request,
             id,

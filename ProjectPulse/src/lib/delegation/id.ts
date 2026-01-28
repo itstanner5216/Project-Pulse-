@@ -62,17 +62,31 @@ export function generateId(): string {
 
 /**
  * Validate that a string looks like a valid delegation ID.
+ * 
+ * Accepts both standard format (adjective-color-animal) and 
+ * unique format with timestamp (adjective-color-animal-timestamp).
  */
 export function isValidId(id: string): boolean {
     const parts = id.split('-');
-    if (parts.length !== 3) return false;
+    
+    // Standard format: adjective-color-animal (3 parts)
+    // Unique format: adjective-color-animal-timestamp (4 parts)
+    if (parts.length !== 3 && parts.length !== 4) return false;
 
     const [adj, color, animal] = parts;
-    return (
+    const isStandardFormat = (
         ADJECTIVES.includes(adj) &&
         COLORS.includes(color) &&
         ANIMALS.includes(animal)
     );
+    
+    // If 4 parts, validate timestamp (should be numeric)
+    if (parts.length === 4) {
+        const timestamp = parts[3];
+        return isStandardFormat && /^\d+$/.test(timestamp);
+    }
+    
+    return isStandardFormat;
 }
 
 /**
