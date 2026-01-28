@@ -58,12 +58,10 @@ async function main() {
     console.log(JSON.stringify({ claimed, pid: process.pid }));
     
     if (claimed) {
-        // Setup cleanup on exit
         const cleanup = async () => {
             await removePid();
         };
         
-        process.on('exit', cleanup);
         process.on('SIGTERM', async () => {
             await cleanup();
             process.exit(0);
