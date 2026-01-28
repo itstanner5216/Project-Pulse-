@@ -2,15 +2,36 @@
  * Tests for spawner module, focusing on workingDir path validation.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { EventEmitter } from 'events';
 
 // We need to test the validateWorkingDir function which is internal
 // So we'll import the module and test through the public API
 import { spawnAgent, SpawnResult } from '../spawner';
 import { DelegationRequest } from '../../lib/delegation/types';
+
+// Mock child_process to prevent real CLI execution
+vi.mock('child_process', () => {
+    return {
+        spawn: vi.fn(() => {
+            const mockProcess = new EventEmitter() as any;
+            mockProcess.stdout = new EventEmitter();
+            mockProcess.stderr = new EventEmitter();
+            mockProcess.kill = vi.fn();
+            
+            // Simulate immediate process completion
+            setImmediate(() => {
+                mockProcess.stdout.emit('data', 'Mock output');
+                mockProcess.emit('close', 0);
+            });
+            
+            return mockProcess;
+        }),
+    };
+});
 
 describe('spawner - workingDir validation', () => {
     let tempDir: string;
@@ -19,6 +40,9 @@ describe('spawner - workingDir validation', () => {
     beforeEach(() => {
         // Create a temporary directory for tests
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-test-'));
+        
+        // Clear all mocks before each test
+        vi.clearAllMocks();
         
         // Create a basic delegation request
         testRequest = {
