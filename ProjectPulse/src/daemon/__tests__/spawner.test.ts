@@ -390,6 +390,38 @@ describe('spawner - agent type validation', () => {
             expect(result.exitCode).toBeGreaterThan(0);
             expect(result.stderr).toMatch(/Invalid agent type/);
         });
+
+        it('should reject inherited property names (prototype pollution protection)', async () => {
+            testRequest.agent = 'toString' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "toString"/);
+        });
+
+        it('should reject __proto__ as agent type', async () => {
+            testRequest.agent = '__proto__' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "__proto__"/);
+        });
+
+        it('should reject constructor as agent type', async () => {
+            testRequest.agent = 'constructor' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "constructor"/);
+        });
+
+        it('should reject hasOwnProperty as agent type', async () => {
+            testRequest.agent = 'hasOwnProperty' as any;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/Invalid agent type: "hasOwnProperty"/);
+        });
     });
 
     describe('error message format', () => {

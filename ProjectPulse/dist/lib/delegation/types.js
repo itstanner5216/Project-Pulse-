@@ -34,7 +34,9 @@ exports.AGENT_FILES = {
  * ```
  */
 function isValidAgentType(value) {
-    return value in exports.AGENT_FILES;
+    // Use Object.hasOwn to check only own properties, not inherited ones
+    // This prevents validation bypass via prototype pollution (e.g., "toString", "__proto__")
+    return Object.hasOwn(exports.AGENT_FILES, value);
 }
 /**
  * Wrap successful data in the standard envelope.

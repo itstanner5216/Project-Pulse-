@@ -63,7 +63,9 @@ export const AGENT_FILES: Record<AgentType, string> = {
  * ```
  */
 export function isValidAgentType(value: string): value is AgentType {
-    return value in AGENT_FILES;
+    // Use Object.hasOwn to check only own properties, not inherited ones
+    // This prevents validation bypass via prototype pollution (e.g., "toString", "__proto__")
+    return Object.hasOwn(AGENT_FILES, value);
 }
 
 /**
