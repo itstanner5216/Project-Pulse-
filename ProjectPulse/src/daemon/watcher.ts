@@ -79,6 +79,8 @@ export class DelegationWatcher {
                     this.watcher = null;
                 }
                 
+                if (!this.running) return;
+
                 // Fall back to polling on watch error
                 this.startPolling();
                 

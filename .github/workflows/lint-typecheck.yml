@@ -1,5 +1,8 @@
 name: Lint and Type Check
 
+permissions:
+  contents: read
+
 on:
   # Run on pushes to main and PRs
   push:

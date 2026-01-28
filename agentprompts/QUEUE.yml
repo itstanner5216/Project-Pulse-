@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 11
+    todo: 10
     doing: 0
-    done: 3
+    done: 4
     blocked: 0
 
 # Workflow notes
