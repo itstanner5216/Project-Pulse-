@@ -96,13 +96,17 @@ describe('spawner - workingDir validation', () => {
             expect(result.stderr).toMatch(/Working directory is not a directory/);
         });
 
-        it('should reject empty string paths', async () => {
+        it('should handle empty string paths (resolves to cwd)', async () => {
             testRequest.workingDir = '';
             const result = await spawnAgent(testRequest, 5000);
             
-            // Empty string resolves to current directory, which should be valid
-            // unless we're in a restricted directory
-            expect(result.exitCode).toBeGreaterThanOrEqual(0);
+            // Empty string resolves to current directory via path.resolve('')
+            // Validation should pass if cwd is not in a restricted directory
+            // The error here is from missing CLI, not from path validation
+            expect(result.exitCode).toBeGreaterThan(0);
+            expect(result.stderr).toMatch(/No supported CLI found/);
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
+            expect(result.stderr).not.toMatch(/Working directory is in restricted path/);
         });
     });
 
