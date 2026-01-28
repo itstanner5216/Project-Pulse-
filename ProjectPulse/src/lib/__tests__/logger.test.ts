@@ -143,7 +143,7 @@ describe('Logger', () => {
             });
 
             const error = new Error('test error');
-            logger.error('operation failed', 'del-123', error);
+            logger.error('operation failed', 'del-123', undefined, error);
 
             await new Promise(resolve => setTimeout(resolve, 100));
 

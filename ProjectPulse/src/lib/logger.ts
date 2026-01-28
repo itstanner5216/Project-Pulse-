@@ -92,7 +92,7 @@ export class Logger {
     /**
      * Log an error message.
      */
-    error(message: string, delegationId?: string, error?: Error, context?: Record<string, unknown>): void {
+    error(message: string, delegationId?: string, context?: Record<string, unknown>, error?: Error): void {
         const errorInfo = error ? {
             message: error.message,
             stack: error.stack,

@@ -39,9 +39,15 @@ function getPidPath(): string {
  * Initialize the daemon logger with structured logging.
  */
 function initDaemonLogger(): Logger {
+    const logLevel = process.env.LOG_LEVEL;
+    const validLevels: Array<'DEBUG' | 'INFO' | 'WARN' | 'ERROR'> = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    const minLevel = logLevel && validLevels.includes(logLevel as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR') 
+        ? (logLevel as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR')
+        : 'INFO';
+    
     return initLogger({
         logPath: getLogPath(),
-        minLevel: process.env.LOG_LEVEL as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' || 'INFO',
+        minLevel,
         format: process.env.LOG_FORMAT === 'json' ? 'json' : 'text',
         maxSize: 10 * 1024 * 1024, // 10MB
         maxFiles: 5,
@@ -164,8 +170,8 @@ export async function startDaemon(): Promise<void> {
             logger.error(
                 `Delegation processing failed: ${error.message}`,
                 id,
-                error,
-                { operation: 'delegation_processing' }
+                { operation: 'delegation_processing' },
+                error
             );
         },
     });
