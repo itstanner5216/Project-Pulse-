@@ -1,1 +1,0 @@
-{"version":3,"file":"delegation-list.d.ts","sourceRoot":"","sources":["../../src/commands/delegation-list.ts"],"names":[],"mappings":"AAAA;;;;;;;;GAQG;AAQH,MAAM,WAAW,WAAW;IACxB,uBAAuB;IACvB,MAAM,CAAC,EAAE,SAAS,GAAG,UAAU,GAAG,KAAK,CAAC;IACxC,oBAAoB;IACpB,MAAM,CAAC,EAAE,MAAM,GAAG,OAAO,CAAC;CAC7B;AAeD;;;;;GAKG;AACH,wBAAsB,cAAc,CAAC,OAAO,GAAE,WAAgB,GAAG,OAAO,CAAC,MAAM,CAAC,CA6D/E"}
