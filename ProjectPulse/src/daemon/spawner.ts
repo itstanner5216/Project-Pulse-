@@ -24,7 +24,7 @@ export interface SpawnResult {
 
 interface CliConfig {
     command: string;
-    args: (prompt: string, agentContent: string) => string[];
+    args: (_prompt: string, _agentContent: string) => string[];
     available: () => Promise<boolean>;
 }
 
@@ -144,7 +144,7 @@ function validateWorkingDir(dir: string): string {
     try {
         // Use lstat to check symlink itself, not target
         stats = fsSync.lstatSync(absPath);
-    } catch (error) {
+    } catch {
         throw new Error(`Working directory does not exist: ${dir}`);
     }
     

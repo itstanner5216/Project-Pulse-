@@ -6,7 +6,6 @@
  */
 
 import { watch, promises as fs, FSWatcher } from 'fs';
-import * as path from 'path';
 import { getSubdir, readRequest, deleteRequest, writeResult } from '../lib/delegation/storage';
 import { DelegationRequest, DelegationResult, DEFAULT_TIMEOUT_MS } from '../lib/delegation/types';
 import { spawnAgent } from './spawner';
@@ -19,11 +18,11 @@ export interface WatcherOptions {
     /** Polling interval if watch is unavailable (ms) */
     pollInterval?: number;
     /** Callback when a request is picked up */
-    onPickup?: (request: DelegationRequest) => void;
+    onPickup?: (_request: DelegationRequest) => void;
     /** Callback when processing completes */
-    onComplete?: (result: DelegationResult) => void;
+    onComplete?: (_result: DelegationResult) => void;
     /** Callback on error */
-    onError?: (error: Error, requestId?: string) => void;
+    onError?: (_error: Error, _requestId?: string) => void;
 }
 
 // ============================================================================
@@ -60,10 +59,10 @@ export class DelegationWatcher {
 
         // Try native watch first
         try {
-            this.watcher = watch(this.pendingDir, async (eventType, filename) => {
+            this.watcher = watch(this.pendingDir, (eventType, filename) => {
                 if (eventType === 'rename' && filename?.endsWith('.json')) {
                     const id = filename.replace('.json', '');
-                    await this.processRequest(id);
+                    void this.processRequest(id);
                 }
             });
 
@@ -118,8 +117,8 @@ export class DelegationWatcher {
     private startPolling(): void {
         if (this.pollTimer) return;
 
-        this.pollTimer = setInterval(async () => {
-            await this.pollOnce();
+        this.pollTimer = setInterval(() => {
+            void this.pollOnce();
         }, this.options.pollInterval);
     }
 

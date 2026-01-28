@@ -8,7 +8,7 @@
  * Returns a list of delegations with their status.
  */
 
-import { listAll, listPending, listComplete, readRequest, readResult, ok, err } from '../lib/delegation';
+import { listPending, listComplete, readRequest, readResult, ok, err } from '../lib/delegation';
 
 // ============================================================================
 // Types
