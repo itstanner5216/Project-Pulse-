@@ -19,9 +19,13 @@ import { getDelegationsDir } from '../../lib/delegation/storage';
 describe('daemon - process existence check', () => {
     let tempDir: string;
     let pidFilePath: string;
+    let originalKill: typeof process.kill;
     const TEST_PID = 99999; // Use a PID that's unlikely to exist
 
     beforeEach(() => {
+        // Save the original process.kill before each test
+        originalKill = process.kill;
+        
         // Create a temporary directory for the delegations folder
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-daemon-test-'));
         pidFilePath = path.join(tempDir, 'daemon.pid');
@@ -31,6 +35,9 @@ describe('daemon - process existence check', () => {
     });
 
     afterEach(() => {
+        // Always restore process.kill, even if test fails
+        process.kill = originalKill;
+        
         // Clean up temporary directory
         if (fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
@@ -65,7 +72,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(TEST_PID));
 
             // Mock process.kill to throw ESRCH error
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === TEST_PID) {
                     const err = new Error('No such process') as NodeJS.ErrnoException;
@@ -82,9 +88,6 @@ describe('daemon - process existence check', () => {
             
             // PID file should be removed
             expect(fs.existsSync(pidFilePath)).toBe(false);
-
-            // Restore original
-            process.kill = originalKill;
         });
 
         it('should handle EPERM error (process exists but permission denied)', async () => {
@@ -92,7 +95,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(TEST_PID));
 
             // Mock process.kill to throw EPERM error
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === TEST_PID) {
                     const err = new Error('Operation not permitted') as NodeJS.ErrnoException;
@@ -109,9 +111,6 @@ describe('daemon - process existence check', () => {
             
             // PID file should NOT be removed
             expect(fs.existsSync(pidFilePath)).toBe(true);
-
-            // Restore original
-            process.kill = originalKill;
         });
 
         it('should handle other unexpected errors', async () => {
@@ -119,7 +118,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(TEST_PID));
 
             // Mock process.kill to throw an unexpected error
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === TEST_PID) {
                     const err = new Error('Some unexpected error') as NodeJS.ErrnoException;
@@ -136,9 +134,6 @@ describe('daemon - process existence check', () => {
             
             // PID file should be removed for safety
             expect(fs.existsSync(pidFilePath)).toBe(false);
-
-            // Restore original
-            process.kill = originalKill;
         });
 
         it('should handle error without code property', async () => {
@@ -146,7 +141,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(TEST_PID));
 
             // Mock process.kill to throw a generic error without code
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === TEST_PID) {
                     throw new Error('Generic error without code');
@@ -161,9 +155,6 @@ describe('daemon - process existence check', () => {
             
             // PID file should be removed for safety
             expect(fs.existsSync(pidFilePath)).toBe(false);
-
-            // Restore original
-            process.kill = originalKill;
         });
     });
 
@@ -173,7 +164,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(1)); // PID 1 usually exists as init/systemd
 
             // Mock process.kill to simulate EPERM (common when checking root processes)
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === 1) {
                     const err = new Error('Operation not permitted') as NodeJS.ErrnoException;
@@ -191,9 +181,6 @@ describe('daemon - process existence check', () => {
             // PID file should remain intact
             expect(fs.existsSync(pidFilePath)).toBe(true);
             expect(fs.readFileSync(pidFilePath, 'utf-8')).toBe('1');
-
-            // Restore original
-            process.kill = originalKill;
         });
 
         it('should clean up stale PID file from crashed process (ESRCH)', async () => {
@@ -201,7 +188,6 @@ describe('daemon - process existence check', () => {
             fs.writeFileSync(pidFilePath, String(TEST_PID));
 
             // Mock process.kill to simulate ESRCH (process doesn't exist)
-            const originalKill = process.kill;
             process.kill = vi.fn((pid: number, signal?: string | number) => {
                 if (pid === TEST_PID) {
                     const err = new Error('No such process') as NodeJS.ErrnoException;
@@ -218,9 +204,6 @@ describe('daemon - process existence check', () => {
             
             // Stale PID file should be cleaned up
             expect(fs.existsSync(pidFilePath)).toBe(false);
-
-            // Restore original
-            process.kill = originalKill;
         });
     });
 });
