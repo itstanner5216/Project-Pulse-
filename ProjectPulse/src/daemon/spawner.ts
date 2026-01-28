@@ -159,8 +159,11 @@ function validateWorkingDir(dir: string): string {
                 throw new Error(`Working directory is not a directory: ${dir}`);
             }
         } catch (error) {
-            if (error instanceof Error && error.message.includes('restricted path')) {
-                throw error;
+            if (error instanceof Error) {
+                // Preserve specific validation errors
+                if (error.message.includes('restricted path') || error.message.includes('not a directory')) {
+                    throw error;
+                }
             }
             throw new Error(`Working directory symlink is broken: ${dir}`);
         }

@@ -127,8 +127,11 @@ function validateWorkingDir(dir) {
     const sensitiveDirs = process.platform === 'win32'
         ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
         : ['/root', '/etc', '/sys', '/proc', '/dev'];
+    // Windows paths are case-insensitive, normalize for comparison
+    const normalizedAbsPath = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
     for (const sensitiveDir of sensitiveDirs) {
-        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+        const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+        if (normalizedAbsPath === normalizedSensitiveDir || normalizedAbsPath.startsWith(normalizedSensitiveDir + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
         }
     }
@@ -145,9 +148,11 @@ function validateWorkingDir(dir) {
     if (stats.isSymbolicLink()) {
         try {
             const realPath = fsSync.realpathSync(absPath);
+            const normalizedRealPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
             // Check if real path is in sensitive directory
             for (const sensitiveDir of sensitiveDirs) {
-                if (realPath === sensitiveDir || realPath.startsWith(sensitiveDir + path.sep)) {
+                const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+                if (normalizedRealPath === normalizedSensitiveDir || normalizedRealPath.startsWith(normalizedSensitiveDir + path.sep)) {
                     throw new Error(`Working directory symlink points to restricted path: ${dir}`);
                 }
             }
@@ -158,8 +163,11 @@ function validateWorkingDir(dir) {
             }
         }
         catch (error) {
-            if (error instanceof Error && error.message.includes('restricted path')) {
-                throw error;
+            if (error instanceof Error) {
+                // Preserve specific validation errors
+                if (error.message.includes('restricted path') || error.message.includes('not a directory')) {
+                    throw error;
+                }
             }
             throw new Error(`Working directory symlink is broken: ${dir}`);
         }
