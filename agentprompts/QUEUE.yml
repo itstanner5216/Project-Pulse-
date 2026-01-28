@@ -339,7 +339,7 @@ phases:
           and build verification.
         source_refs:
           - "FOLLOWUP_TASKS.md#task-14-setup-cicd-pipeline"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Add lint check (ESLint) workflow"
           - "Add type check (TypeScript) workflow"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 7
+    todo: 6
     doing: 0
-    done: 7
+    done: 8
     blocked: 0
 
 # Workflow notes
