@@ -77,6 +77,14 @@ async function removePid(): Promise<void> {
 
 /**
  * Check if the daemon is already running.
+ * 
+ * This function uses `process.kill(pid, 0)` to check process existence.
+ * On POSIX systems, this can return different error codes:
+ * - ESRCH: Process doesn't exist (we clean up stale PID file)
+ * - EPERM: Process exists but is owned by another user (daemon is running)
+ * 
+ * This distinction is important in multi-user scenarios where the daemon
+ * might be running as a different user (e.g., root vs regular user).
  */
 export async function isRunning(): Promise<boolean> {
     const pid = await readPid();
@@ -86,10 +94,22 @@ export async function isRunning(): Promise<boolean> {
         // Send signal 0 to check if process exists
         process.kill(pid, 0);
         return true;
-    } catch {
-        // Process doesn't exist, clean up stale PID file
-        await removePid();
-        return false;
+    } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        
+        if (err.code === 'ESRCH') {
+            // Process doesn't exist - clean up stale PID file
+            await removePid();
+            return false;
+        } else if (err.code === 'EPERM') {
+            // Process exists but we don't have permission to signal it
+            // This means daemon IS running (just owned by another user)
+            return true;
+        } else {
+            // Unexpected error - clean up and assume not running for safety
+            await removePid();
+            return false;
+        }
     }
 }
 
