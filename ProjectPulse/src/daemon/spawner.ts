@@ -90,7 +90,9 @@ async function commandExists(cmd: string): Promise<boolean> {
 }
 
 /**
- * Detect which CLI to use based on availability.
+ * Selects the first available CLI from the module's priority order.
+ *
+ * @returns The chosen CLI name (`'opencode'`, `'codex'`, `'gemini'`, or `'claude'`) if available, or `null` if none are found.
  */
 async function detectCli(): Promise<Exclude<SupportedCli, 'auto'> | null> {
     // Priority order
@@ -106,11 +108,14 @@ async function detectCli(): Promise<Exclude<SupportedCli, 'auto'> | null> {
 }
 
 /**
- * Validate and sanitize a working directory path.
- * 
+ * Validate a working directory path and return its absolute path.
+ *
+ * Ensures the resolved path exists, is a directory, and does not lie within platform-specific restricted locations.
+ * If the path is a symbolic link, validates the symlink target with the same checks.
+ *
  * @param dir - The working directory path to validate
  * @returns The absolute, validated path
- * @throws Error if the path is invalid, doesn't exist, isn't a directory, or is in a restricted location
+ * @throws Error if the path is in a restricted location, does not exist, is not a directory, or is a broken symlink
  */
 function validateWorkingDir(dir: string): string {
     // Resolve to absolute path
@@ -181,12 +186,12 @@ function validateWorkingDir(dir: string): string {
 }
 
 /**
- * Load agent prompt content from agentprompts/ directory.
- * 
- * @param agent - The agent type to load
- * @param workingDir - The working directory to search for agent prompts
- * @returns The agent prompt content
- * @throws Error if agent type is invalid or working directory is invalid
+ * Retrieve the prompt text for the specified agent from the project's agentprompts directory or return a default prompt if none is found.
+ *
+ * @param agent - The agent type whose prompt to load
+ * @param workingDir - The validated working directory to search for agent prompt files
+ * @returns The agent prompt text
+ * @throws Error if `agent` is not a recognized AgentType or `workingDir` is invalid
  */
 async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<string> {
     // Validate agent type before attempting to load files
@@ -223,12 +228,13 @@ async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<st
 // ============================================================================
 
 /**
- * Spawn a CLI subprocess to run an agent.
+ * Spawn a configured CLI process to execute the given delegation request for an agent.
  *
- * @param request - The delegation request
- * @param timeoutMs - Maximum runtime in milliseconds
- * @returns The spawn result with stdout, stderr, exitCode
- */
+ * Validates the agent type and working directory, selects or validates the target CLI, loads the agent prompt, runs the CLI with the assembled arguments, and returns the process outcome.
+ *
+ * @param request - Delegation request containing agent, workingDir, prompt, id, parentSession, and targetCli
+ * @param timeoutMs - Maximum allowed runtime for the spawned process in milliseconds
+ * @returns The SpawnResult containing captured `stdout`, `stderr`, the process `exitCode` (process exit code or `1` on failure), and `timedOut` which is `true` if the process exceeded `timeoutMs` and was terminated. */
 export async function spawnAgent(
     request: DelegationRequest,
     timeoutMs: number
