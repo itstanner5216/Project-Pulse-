@@ -2,7 +2,7 @@
  * Tests for ID generation module, focusing on collision scenarios and uniqueness.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateId, isValidId, generateUniqueId } from '../id';
 
 describe('generateId', () => {
