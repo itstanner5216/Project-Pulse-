@@ -12,11 +12,18 @@ describe('DelegationWatcher - error handling and cleanup', () => {
     let tempDir: string;
     let pendingDir: string;
     let watcher: DelegationWatcher;
+    let originalEnv: string | undefined;
 
     beforeEach(() => {
         // Create a temporary directory for tests
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-watcher-test-'));
-        pendingDir = path.join(tempDir, '.projectpulse', 'pending');
+        
+        // Set environment variable so DelegationWatcher uses our temp directory
+        originalEnv = process.env.PROJECTPULSE_DELEGATIONS_DIR;
+        process.env.PROJECTPULSE_DELEGATIONS_DIR = tempDir;
+        
+        // Create pending directory
+        pendingDir = path.join(tempDir, 'pending');
         fs.mkdirSync(pendingDir, { recursive: true });
     });
 
@@ -24,6 +31,13 @@ describe('DelegationWatcher - error handling and cleanup', () => {
         // Stop watcher if running
         if (watcher) {
             watcher.stop();
+        }
+        
+        // Restore environment variable
+        if (originalEnv !== undefined) {
+            process.env.PROJECTPULSE_DELEGATIONS_DIR = originalEnv;
+        } else {
+            delete process.env.PROJECTPULSE_DELEGATIONS_DIR;
         }
         
         // Clean up temporary directory
