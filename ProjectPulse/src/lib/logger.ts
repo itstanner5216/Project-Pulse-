@@ -127,7 +127,7 @@ export class Logger {
         
         // Queue writes to prevent concurrent file access
         this.writeQueue = this.writeQueue
-            .then(() => this.writeEntry(entry))
+            .then(async () => this.writeEntry(entry))
             .catch((err) => {
                 // Fallback to console if file writing fails
                 console.error('Logger write failed:', err.message);

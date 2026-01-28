@@ -14,7 +14,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { DelegationWatcher } from './watcher';
 import { getDelegationsDir } from '../lib/delegation/storage';
-import { initLogger, getLogger, Logger } from '../lib/logger';
+import { initLogger, Logger } from '../lib/logger';
 
 // ============================================================================
 // Constants
