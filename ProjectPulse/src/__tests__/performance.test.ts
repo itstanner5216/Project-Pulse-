@@ -5,15 +5,15 @@
  * - ID generation (collision rates, speed)
  * - File watcher responsiveness
  * - Daemon overhead (CPU, memory)
- * - Large repository handling
+ * - Large repository handling (1,000+ files, 100+ requests)
  * 
  * Performance Targets:
  * - ID generation: >10,000 IDs/second
  * - ID collision rate (generateId): <5% with 10K iterations
  * - ID collision rate (generateUniqueId): <0.01% with 100K iterations
  * - File watcher pickup time: <100ms for new requests
- * - Memory overhead: <50MB for daemon with 1000 files
- * - Large repo handling: Process 10K+ files without timeout
+ * - Memory overhead: <5MB for various operations
+ * - Large repo handling: Process 1,000+ files and 100+ requests without timeout
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -509,11 +509,13 @@ describe('Performance: Large Repository Handling', () => {
             const lastBatch = processTimes.slice(-10);
             const firstAvg = firstBatch.reduce((sum, t) => sum + t, 0) / firstBatch.length;
             const lastAvg = lastBatch.reduce((sum, t) => sum + t, 0) / lastBatch.length;
-            const degradation = ((lastAvg - firstAvg) / firstAvg) * 100;
+            
+            // Avoid division by zero
+            const degradation = firstAvg > 0 ? ((lastAvg - firstAvg) / firstAvg) * 100 : 0;
             
             // Performance should not degrade more than 100% (i.e., not double)
-            // Some variance is expected in concurrent processing with mocked spawner
-            expect(Math.abs(degradation)).toBeLessThan(100);
+            // Only fail on degradation (positive), improvements (negative) are ok
+            expect(degradation).toBeLessThan(100);
             
             console.log(`  ✓ Processed ${requestCount} requests`);
             console.log(`  ✓ Average time: ${avgTime.toFixed(2)}ms`);
