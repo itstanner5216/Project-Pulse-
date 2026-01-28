@@ -106,11 +106,11 @@ async function detectCli(): Promise<Exclude<SupportedCli, 'auto'> | null> {
 }
 
 /**
- * Validate and sanitize a working directory path.
- * 
+ * Validate a working directory and return its absolute, canonical path.
+ *
  * @param dir - The working directory path to validate
- * @returns The absolute, validated path
- * @throws Error if the path is invalid, doesn't exist, isn't a directory, or is in a restricted location
+ * @returns The absolute validated path
+ * @throws Error if the path does not exist, is not a directory, is a broken symlink, or is inside a restricted system location
  */
 function validateWorkingDir(dir: string): string {
     // Resolve to absolute path
@@ -171,11 +171,13 @@ function validateWorkingDir(dir: string): string {
 }
 
 /**
- * Load agent prompt content from agentprompts/ directory.
- * 
+ * Load the prompt template for a given agent from the project's agentprompts directory.
+ *
+ * Attempts to read the agent's prompt file from one of three locations relative to the validated working directory and the current working directory; if no file is found, returns a built-in default prompt.
+ *
  * @param agent - The agent type to load the prompt for
- * @param validWorkingDir - Already validated working directory path
- * @returns The agent prompt content as a string
+ * @param validWorkingDir - The already-validated working directory to resolve project-relative prompt files
+ * @returns The agent prompt content; if no prompt file is found, a default prompt string tailored to `agent`
  */
 async function loadAgentPrompt(agent: AgentType, validWorkingDir: string): Promise<string> {
     // Look for agentprompts/ in the project root
@@ -203,11 +205,11 @@ async function loadAgentPrompt(agent: AgentType, validWorkingDir: string): Promi
 // ============================================================================
 
 /**
- * Spawn a CLI subprocess to run an agent.
+ * Launches the selected AI CLI to execute a delegated agent task and captures its output.
  *
- * @param request - The delegation request
- * @param timeoutMs - Maximum runtime in milliseconds
- * @returns The spawn result with stdout, stderr, exitCode
+ * @param request - Delegation request containing agent id, prompt, workingDir, targetCli, parentSession, and id
+ * @param timeoutMs - Maximum runtime in milliseconds before the process is terminated
+ * @returns An object with captured `stdout` and `stderr`, the process `exitCode`, and a `timedOut` flag
  */
 export async function spawnAgent(
     request: DelegationRequest,
