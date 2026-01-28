@@ -367,6 +367,7 @@ describe('spawner - force-kill timer cleanup', () => {
     });
     
     it('should complete promptly when restricted path is used', async () => {
+        const restrictedPath = process.platform === 'win32' ? 'C:\\Windows' : '/etc';
         const testRequest: DelegationRequest = {
             id: 'test-restricted-path',
             parentSession: 'test-session',
@@ -375,7 +376,7 @@ describe('spawner - force-kill timer cleanup', () => {
             agent: 'explorer',
             prompt: 'test prompt',
             status: 'pending',
-            workingDir: '/etc',
+            workingDir: restrictedPath,
             createdAt: new Date().toISOString(),
             timeout: 60,
         };
