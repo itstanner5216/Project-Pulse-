@@ -10,6 +10,8 @@
   "name": "ProjectPulse API Documentation",
   "includeVersion": true,
   "searchInComments": true,
+  "customCss": "docs/typedoc-custom.css",
+  "customJs": "docs/typedoc-init.js",
   "visibilityFilters": {
     "protected": false,
     "private": false,
