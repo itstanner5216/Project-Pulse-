@@ -9,7 +9,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import * as fsSync from 'fs';
-import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType } from '../lib/delegation/types';
+import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType, isValidAgentType } from '../lib/delegation/types';
 
 // ============================================================================
 // Types
@@ -83,8 +83,7 @@ const CLI_CONFIGS: Record<Exclude<SupportedCli, 'auto'>, CliConfig> = {
  */
 async function commandExists(cmd: string): Promise<boolean> {
     return new Promise((resolve) => {
-        const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-        const proc = spawn(whichCmd, [cmd], { stdio: 'ignore' });
+        const proc = spawn('which', [cmd], { stdio: 'ignore' });
         proc.on('close', (code) => resolve(code === 0));
         proc.on('error', () => resolve(false));
     });
@@ -123,12 +122,19 @@ function validateWorkingDir(dir: string): string {
         ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
         : ['/root', '/etc', '/sys', '/proc', '/dev'];
     
-    // Windows paths are case-insensitive, normalize for comparison
-    const normalizedAbsPath = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
+    // Helper function to normalize paths for comparison
+    // On Windows: normalize and lowercase for case-insensitive comparison
+    // On Unix: just normalize (paths are case-sensitive)
+    const normalizeForCompare = (p: string): string => {
+        const normalized = path.normalize(p);
+        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
     
-    for (const sensitiveDir of sensitiveDirs) {
-        const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
-        if (normalizedAbsPath === normalizedSensitiveDir || normalizedAbsPath.startsWith(normalizedSensitiveDir + path.sep)) {
+    const normalizedAbsPath = normalizeForCompare(absPath);
+    const normalizedSensitiveDirs = sensitiveDirs.map(normalizeForCompare);
+    
+    for (const sensitiveDir of normalizedSensitiveDirs) {
+        if (normalizedAbsPath === sensitiveDir || normalizedAbsPath.startsWith(sensitiveDir + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
         }
     }
@@ -146,11 +152,10 @@ function validateWorkingDir(dir: string): string {
     if (stats.isSymbolicLink()) {
         try {
             const realPath = fsSync.realpathSync(absPath);
-            const normalizedRealPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+            const normalizedRealPath = normalizeForCompare(realPath);
             // Check if real path is in sensitive directory
-            for (const sensitiveDir of sensitiveDirs) {
-                const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
-                if (normalizedRealPath === normalizedSensitiveDir || normalizedRealPath.startsWith(normalizedSensitiveDir + path.sep)) {
+            for (const sensitiveDir of normalizedSensitiveDirs) {
+                if (normalizedRealPath === sensitiveDir || normalizedRealPath.startsWith(sensitiveDir + path.sep)) {
                     throw new Error(`Working directory symlink points to restricted path: ${dir}`);
                 }
             }
@@ -160,11 +165,8 @@ function validateWorkingDir(dir: string): string {
                 throw new Error(`Working directory is not a directory: ${dir}`);
             }
         } catch (error) {
-            if (error instanceof Error) {
-                // Preserve specific validation errors
-                if (error.message.includes('restricted path') || error.message.includes('not a directory')) {
-                    throw error;
-                }
+            if (error instanceof Error && error.message.includes('restricted path')) {
+                throw error;
             }
             throw new Error(`Working directory symlink is broken: ${dir}`);
         }
@@ -180,8 +182,19 @@ function validateWorkingDir(dir: string): string {
 
 /**
  * Load agent prompt content from agentprompts/ directory.
+ * 
+ * @param agent - The agent type to load
+ * @param workingDir - The working directory to search for agent prompts
+ * @returns The agent prompt content
+ * @throws Error if agent type is invalid or working directory is invalid
  */
 async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<string> {
+    // Validate agent type before attempting to load files
+    if (!isValidAgentType(agent)) {
+        const validTypes = Object.keys(AGENT_FILES).join(', ');
+        throw new Error(`Invalid agent type: "${agent}". Valid agent types are: ${validTypes}`);
+    }
+    
     // Validate working directory before using it
     const validWorkingDir = validateWorkingDir(workingDir);
     
@@ -220,6 +233,17 @@ export async function spawnAgent(
     request: DelegationRequest,
     timeoutMs: number
 ): Promise<SpawnResult> {
+    // Validate agent type first (before any other operations)
+    if (!isValidAgentType(request.agent)) {
+        const validTypes = Object.keys(AGENT_FILES).join(', ');
+        return {
+            stdout: '',
+            stderr: `Invalid agent type: "${request.agent}". Valid agent types are: ${validTypes}`,
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
+    
     // Validate working directory before using it
     let validWorkingDir: string;
     try {
@@ -260,7 +284,17 @@ export async function spawnAgent(
     }
 
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, validWorkingDir);
+    let agentContent: string;
+    try {
+        agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    } catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Failed to load agent prompt',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
 
     // Build command
     const config = CLI_CONFIGS[cli];
@@ -271,7 +305,6 @@ export async function spawnAgent(
         let stderr = '';
         let timedOut = false;
         let finished = false;
-        let forceKillHandle: NodeJS.Timeout | null = null;
 
         const proc: ChildProcess = spawn(config.command, args, {
             cwd: validWorkingDir,
@@ -304,7 +337,7 @@ export async function spawnAgent(
                 proc.kill('SIGTERM');
 
                 // Force kill after 5 seconds
-                forceKillHandle = setTimeout(() => {
+                setTimeout(() => {
                     if (!finished) {
                         proc.kill('SIGKILL');
                     }
@@ -316,9 +349,6 @@ export async function spawnAgent(
         proc.on('close', (code) => {
             finished = true;
             clearTimeout(timeoutHandle);
-            if (forceKillHandle) {
-                clearTimeout(forceKillHandle);
-            }
 
             resolve({
                 stdout,
@@ -331,9 +361,6 @@ export async function spawnAgent(
         proc.on('error', (err) => {
             finished = true;
             clearTimeout(timeoutHandle);
-            if (forceKillHandle) {
-                clearTimeout(forceKillHandle);
-            }
 
             resolve({
                 stdout,

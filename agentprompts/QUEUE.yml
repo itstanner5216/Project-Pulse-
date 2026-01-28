@@ -160,7 +160,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#6-no-validation-of-agent-type-at-runtime"
           - "FOLLOWUP_TASKS.md#task-6-validate-agent-type-at-runtime"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Add validation at start of loadAgentPrompt() function"
           - "Throw descriptive error if agent type is invalid"
