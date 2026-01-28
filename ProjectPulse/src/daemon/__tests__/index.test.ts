@@ -28,7 +28,7 @@ describe('daemon - race condition prevention', () => {
         // For now, we'll test the core logic
     });
 
-    afterEach(async () => {
+    afterEach(() => {
         // Clean up temporary directory
         if (fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
@@ -36,13 +36,6 @@ describe('daemon - race condition prevention', () => {
         
         // Restore environment
         process.env = originalEnv;
-        
-        // Ensure daemon is stopped
-        try {
-            await stopDaemon();
-        } catch {
-            // Ignore errors during cleanup
-        }
     });
 
     describe('writePid atomic file creation', () => {

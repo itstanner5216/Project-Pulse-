@@ -129,16 +129,23 @@ let watcher: DelegationWatcher | null = null;
  * Start the daemon.
  * 
  * Uses atomic PID file creation to prevent race conditions when multiple
- * processes try to start the daemon simultaneously.
+ * processes try to start the daemon simultaneously. If a stale PID file
+ * exists from a crashed daemon, it will be cleaned up and retried once.
  */
 export async function startDaemon(): Promise<void> {
-    // Atomically claim daemon ownership via PID file
-    // This replaces the race-prone isRunning() check
-    const claimed = await writePid();
+    let claimed = await writePid();
     
     if (!claimed) {
-        console.log('Daemon is already running');
-        return;
+        const running = await isRunning();
+        if (running) {
+            console.log('Daemon is already running');
+            return;
+        }
+        claimed = await writePid();
+        if (!claimed) {
+            console.log('Daemon is already running');
+            return;
+        }
     }
 
     // Successfully claimed - log after claiming to avoid misleading log entries

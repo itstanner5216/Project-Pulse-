@@ -26,7 +26,7 @@ describe('daemon - multi-process integration', () => {
 const fs = require('fs').promises;
 const path = require('path');
 
-const pidPath = process.argv[2] || path.join('${tempDir}', 'test.pid');
+const pidPath = process.argv[2] || path.join(${JSON.stringify(tempDir)}, 'test.pid');
 
 async function writePid() {
     const dir = path.dirname(pidPath);
@@ -289,4 +289,113 @@ main().catch(err => {
         expect(results[1]).toBe(true);
         expect(results[2]).toBe(true);
     }, 15000);
+
+    it('should recover from stale PID file left by crashed daemon', async () => {
+        const pidPath = path.join(tempDir, 'stale-pid-test.pid');
+        
+        const stalePid = 999999;
+        await fs.promises.mkdir(path.dirname(pidPath), { recursive: true });
+        await fs.promises.writeFile(pidPath, String(stalePid));
+        
+        expect(fs.existsSync(pidPath)).toBe(true);
+        
+        const recoveryScript = path.join(tempDir, 'recovery-daemon.js');
+        const recoveryScriptContent = `
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const path = require('path');
+
+const pidPath = process.argv[2];
+
+async function writePid() {
+    try {
+        const handle = await fs.open(pidPath, 'wx');
+        await handle.writeFile(String(process.pid));
+        await handle.close();
+        return true;
+    } catch (error) {
+        if (error.code === 'EEXIST') {
+            return false;
+        }
+        throw error;
+    }
+}
+
+async function readPid() {
+    try {
+        const content = await fs.readFile(pidPath, 'utf-8');
+        return parseInt(content.trim(), 10);
+    } catch {
+        return null;
+    }
+}
+
+async function removePid() {
+    try {
+        await fs.unlink(pidPath);
+    } catch {}
+}
+
+async function isRunning() {
+    const pid = await readPid();
+    if (!pid) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        await removePid();
+        return false;
+    }
+}
+
+async function main() {
+    let claimed = await writePid();
+    
+    if (!claimed) {
+        const running = await isRunning();
+        if (running) {
+            console.log(JSON.stringify({ claimed: false, reason: 'running', pid: process.pid }));
+            process.exit(1);
+        }
+        claimed = await writePid();
+        if (!claimed) {
+            console.log(JSON.stringify({ claimed: false, reason: 'retry_failed', pid: process.pid }));
+            process.exit(1);
+        }
+    }
+    
+    console.log(JSON.stringify({ claimed: true, pid: process.pid, recoveredFromStale: true }));
+    await removePid();
+    process.exit(0);
+}
+
+main().catch(err => {
+    console.error('Error:', err.message);
+    process.exit(2);
+});
+`;
+        
+        await fs.promises.writeFile(recoveryScript, recoveryScriptContent);
+        
+        const proc = spawn('node', [recoveryScript, pidPath], {
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        
+        const result = await new Promise<{ claimed: boolean; recoveredFromStale?: boolean }>((resolve) => {
+            let stdout = '';
+            proc.stdout?.on('data', (data) => {
+                stdout += data.toString();
+            });
+            proc.on('close', (code) => {
+                try {
+                    resolve(JSON.parse(stdout.trim()));
+                } catch {
+                    resolve({ claimed: false });
+                }
+            });
+        });
+        
+        expect(result.claimed).toBe(true);
+        expect(result.recoveredFromStale).toBe(true);
+    }, 10000);
 });
