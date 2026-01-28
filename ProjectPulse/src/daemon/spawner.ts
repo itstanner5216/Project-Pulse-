@@ -123,7 +123,9 @@ function validateWorkingDir(dir: string): string {
         : ['/root', '/etc', '/sys', '/proc', '/dev'];
     
     for (const sensitiveDir of sensitiveDirs) {
-        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+        const comparePath = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
+        const compareSensitive = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+        if (comparePath === compareSensitive || comparePath.startsWith(compareSensitive + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
         }
     }
