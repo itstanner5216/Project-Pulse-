@@ -23,7 +23,7 @@ jobs:
   analyze:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 60
     
     strategy:
       fail-fast: false
@@ -66,16 +66,6 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
-          output: sarif-results
-          upload: true
-      
-      - name: Upload CodeQL results
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: sarif-results/${{ matrix.language }}.sarif
-          category: "/language:${{ matrix.language }}"
-        continue-on-error: true
       
       - name: Report CodeQL Results
         if: always()

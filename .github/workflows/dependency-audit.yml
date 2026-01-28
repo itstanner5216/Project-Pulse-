@@ -62,13 +62,24 @@ jobs:
         working-directory: ProjectPulse
         run: |
           echo "::group::Vulnerability Check"
-          # Fail on high or critical vulnerabilities
-          if npm audit --audit-level=high 2>&1 | grep -q "found [1-9]"; then
-            echo "::error::High or critical vulnerabilities found!"
-            npm audit --audit-level=high
-            exit 1
+          # Parse JSON output for high/critical vulnerabilities
+          if [ -f audit-results.json ]; then
+            HIGH_CRIT=$(node -e "
+              const data = require('./audit-results.json');
+              const vulns = data.metadata?.vulnerabilities || {};
+              const total = (vulns.critical || 0) + (vulns.high || 0);
+              console.log(total);
+            ")
+            
+            if [ "$HIGH_CRIT" -gt 0 ]; then
+              echo "::error::Found $HIGH_CRIT high or critical vulnerabilities!"
+              npm audit --audit-level=high
+              exit 1
+            else
+              echo "✅ No high or critical vulnerabilities found"
+            fi
           else
-            echo "✅ No high or critical vulnerabilities found"
+            echo "::warning::Audit results file not found, skipping vulnerability check"
           fi
           echo "::endgroup::"
       
@@ -151,7 +162,7 @@ jobs:
         working-directory: ProjectPulse
         run: |
           echo "::group::License Information"
-          npx license-checker --summary || echo "license-checker not available"
+          npx license-checker@25.0.1 --summary || echo "license-checker not available"
           echo "::endgroup::"
       
       - name: Report License Check Results

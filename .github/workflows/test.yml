@@ -12,6 +12,10 @@ on:
   pull_request:
     paths:
       - 'ProjectPulse/**/*.ts'
+      - 'ProjectPulse/**/*.sh'
+      - 'ProjectPulse/lib/**'
+      - 'ProjectPulse/bin/**'
+      - 'ProjectPulse/pulse/**'
       - 'ProjectPulse/tests/**'
       - 'ProjectPulse/package.json'
       - 'ProjectPulse/package-lock.json'
@@ -39,13 +43,9 @@ jobs:
         working-directory: ProjectPulse
         run: npm ci
       
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         working-directory: ProjectPulse
-        run: npm test -- --run --reporter=verbose
-      
-      - name: Generate coverage report
-        working-directory: ProjectPulse
-        run: npm test -- --run --coverage
+        run: npm test -- --run --reporter=verbose --coverage
       
       - name: Upload coverage to artifacts
         if: always()

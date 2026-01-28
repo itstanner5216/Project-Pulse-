@@ -4,12 +4,7 @@ This directory contains all GitHub Actions workflows for Project Pulse automated
 
 ## Workflows Overview
 
-### 1. CI/CD Pipeline (`ci.yml`)
-**Purpose:** Main CI/CD status check workflow  
-**Triggers:** Push to main/copilot branches, Pull Requests  
-**Description:** Provides a summary of all CI/CD checks. This workflow ensures all required checks are visible.
-
-### 2. Lint and Type Check (`lint-typecheck.yml`)
+### 1. Lint and Type Check (`lint-typecheck.yml`)
 **Purpose:** Code quality and type safety verification  
 **Triggers:** Push to main/copilot branches, Pull Requests  
 **Jobs:**
@@ -17,24 +12,22 @@ This directory contains all GitHub Actions workflows for Project Pulse automated
 - **TypeScript Type Check:** Validates TypeScript types without emitting files
 - **Build Check:** Verifies the project builds successfully
 
-### 3. Test Suite (`test.yml`)
+### 2. Test Suite (`test.yml`)
 **Purpose:** Automated testing with coverage reporting  
 **Triggers:** Push to main/copilot branches, Pull Requests  
 **Jobs:**
-- **Unit Tests:** Runs Vitest unit tests with verbose output
-- **Coverage Report:** Generates and uploads code coverage reports
+- **Unit Tests:** Runs Vitest unit tests with verbose output and coverage
 - **Integration Tests:** Runs smoke tests and integration test scripts
 - **PR Comments:** Posts coverage summary to pull requests
 
-### 4. CodeQL Security Analysis (`codeql.yml`)
+### 3. CodeQL Security Analysis (`codeql.yml`)
 **Purpose:** Advanced security vulnerability detection  
 **Triggers:** Push to main/copilot branches, Pull Requests, Weekly schedule, Manual  
 **Jobs:**
 - **CodeQL Analysis:** Scans JavaScript/TypeScript code for security vulnerabilities
-- **SARIF Upload:** Uploads results to GitHub Security tab
 - **Schedule:** Runs weekly on Mondays at 00:00 UTC
 
-### 5. Dependency Audit (`dependency-audit.yml`)
+### 4. Dependency Audit (`dependency-audit.yml`)
 **Purpose:** Dependency security and license compliance  
 **Triggers:** Push to main/copilot branches, Pull Requests, Daily schedule, Manual  
 **Jobs:**
@@ -43,7 +36,7 @@ This directory contains all GitHub Actions workflows for Project Pulse automated
 - **PR Comments:** Posts audit summary to pull requests
 - **Schedule:** Runs daily at 02:00 UTC
 
-### 6. Queue Validation (`queue-validate.yml`)
+### 5. Queue Validation (`queue-validate.yml`)
 **Purpose:** Validates task queue YAML structure  
 **Triggers:** Pull Requests modifying QUEUE.yml, Manual  
 **Jobs:**

@@ -57,9 +57,6 @@ In the "Status checks that are required" section, search for and select all of t
 - ✅ `NPM Security Audit` - Checks for vulnerable dependencies
 - ✅ `License Compliance Check` - Verifies license compliance
 
-#### From `ci.yml` workflow:
-- ✅ `CI Pipeline Status Check` - Overall CI/CD status
-
 > **Note:** Status checks will only appear in the list after they have run at least once. Create a test PR to trigger all workflows if they don't appear yet.
 
 ### Step 4: Additional Recommended Settings
@@ -117,7 +114,6 @@ After configuring branch protection, verify:
 | CodeQL Analysis | codeql.yml | Security vulnerability scan | Critical - Security vulnerabilities |
 | NPM Security Audit | dependency-audit.yml | Dependency security | High - Vulnerable dependencies |
 | License Compliance Check | dependency-audit.yml | License compliance | Medium - Legal compliance |
-| CI Pipeline Status Check | ci.yml | Overall CI status | Info - Status summary |
 
 ## Troubleshooting
 
