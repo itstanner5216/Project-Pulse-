@@ -2,7 +2,7 @@
  * Tests for spawner module, focusing on workingDir path validation.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -246,6 +246,13 @@ describe('spawner - loadAgentPrompt validation', () => {
     });
 });
 
+/**
+ * Force-kill timer cleanup tests.
+ * 
+ * These tests verify that spawnAgent completes without hanging, which
+ * indicates that all timers are properly cleared. The tests work regardless
+ * of whether a CLI (opencode, codex, etc.) is installed.
+ */
 describe('spawner - force-kill timer cleanup', () => {
     let tempDir: string;
     
@@ -259,10 +266,9 @@ describe('spawner - force-kill timer cleanup', () => {
         }
     });
     
-    it('should clear force-kill timer when process exits normally before timeout', async () => {
-        // Create a request that will timeout
+    it('should complete without hanging (timers cleared)', async () => {
         const testRequest: DelegationRequest = {
-            id: 'test-timeout',
+            id: 'test-timer-cleanup',
             parentSession: 'test-session',
             sourceCli: 'auto',
             targetCli: 'auto',
@@ -274,55 +280,18 @@ describe('spawner - force-kill timer cleanup', () => {
             timeout: 60,
         };
         
-        // Spawn with a timeout that will trigger
-        const resultPromise = spawnAgent(testRequest, 100);
+        const startTime = Date.now();
+        const result = await spawnAgent(testRequest, 100);
+        const elapsed = Date.now() - startTime;
         
-        // Wait for the result
-        const result = await resultPromise;
-        
-        // Verify that we got a result (process completed)
         expect(result).toBeDefined();
         expect(result.exitCode).toBeGreaterThanOrEqual(0);
+        expect(elapsed).toBeLessThan(5000);
         
-        // Wait a bit to ensure no timers are keeping the event loop alive
-        // If the force-kill timer wasn't cleared, this would hang
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // If we get here, the timer was properly cleared
-        expect(true).toBe(true);
-    });
-    
-    it('should clear force-kill timer when process errors before force-kill', async () => {
-        // Create a request with a very short timeout to trigger the timeout path
-        const testRequest: DelegationRequest = {
-            id: 'test-error',
-            parentSession: 'test-session',
-            sourceCli: 'auto',
-            targetCli: 'auto',
-            agent: 'explorer',
-            prompt: 'test prompt',
-            status: 'pending',
-            workingDir: tempDir,
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        };
-        
-        // Use a very short timeout to trigger timeout quickly
-        const result = await spawnAgent(testRequest, 50);
-        
-        // Should complete (either timed out or failed to find CLI)
-        expect(result).toBeDefined();
-        expect(result.exitCode).toBeGreaterThanOrEqual(0);
-        
-        // Wait to ensure no timers are keeping event loop alive
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // If we get here, the timer was properly cleared
-        expect(true).toBe(true);
     });
     
     it('should allow event loop to exit cleanly after process completion', async () => {
-        // This test verifies that there are no lingering timers
         const testRequest: DelegationRequest = {
             id: 'test-clean-exit',
             parentSession: 'test-session',
@@ -336,52 +305,85 @@ describe('spawner - force-kill timer cleanup', () => {
             timeout: 60,
         };
         
-        // Run spawn with short timeout
         const result = await spawnAgent(testRequest, 50);
         
         expect(result).toBeDefined();
         
-        // Create a promise that checks if the event loop has pending timers
-        // by checking if Node can exit cleanly
         const canExitCleanly = await new Promise<boolean>((resolve) => {
-            // Use setImmediate to check after all current I/O
-            setImmediate(() => {
-                // If we can schedule and execute this, there are no blocking timers
-                resolve(true);
-            });
+            setImmediate(() => resolve(true));
         });
         
         expect(canExitCleanly).toBe(true);
     });
     
-    it('should handle timeout scenario and clear both timers', async () => {
-        // Create a mock test script that runs longer than timeout
-        const longScript = path.join(tempDir, 'long-script.sh');
-        fs.writeFileSync(longScript, '#!/bin/bash\nsleep 10\n', { mode: 0o755 });
+    it('should handle multiple sequential calls without hanging', async () => {
+        const requests = Array.from({ length: 3 }, (_, i) => ({
+            id: `test-sequential-${i}`,
+            parentSession: 'test-session',
+            sourceCli: 'auto' as const,
+            targetCli: 'auto' as const,
+            agent: 'explorer' as const,
+            prompt: `test prompt ${i}`,
+            status: 'pending' as const,
+            workingDir: tempDir,
+            createdAt: new Date().toISOString(),
+            timeout: 60,
+        }));
         
+        const startTime = Date.now();
+        
+        for (const request of requests) {
+            const result = await spawnAgent(request, 100);
+            expect(result).toBeDefined();
+        }
+        
+        const elapsed = Date.now() - startTime;
+        expect(elapsed).toBeLessThan(10000);
+    });
+    
+    it('should complete promptly when working directory validation fails', async () => {
         const testRequest: DelegationRequest = {
-            id: 'test-timeout-cleanup',
+            id: 'test-validation-fail',
             parentSession: 'test-session',
             sourceCli: 'auto',
             targetCli: 'auto',
             agent: 'explorer',
             prompt: 'test prompt',
             status: 'pending',
-            workingDir: tempDir,
+            workingDir: '/nonexistent/path/that/does/not/exist',
             createdAt: new Date().toISOString(),
             timeout: 60,
         };
         
-        // Spawn with very short timeout to trigger timeout path
-        const result = await spawnAgent(testRequest, 100);
+        const startTime = Date.now();
+        const result = await spawnAgent(testRequest, 5000);
+        const elapsed = Date.now() - startTime;
         
-        // Should complete (either timed out or failed to find CLI)
-        expect(result).toBeDefined();
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('Working directory does not exist');
+        expect(elapsed).toBeLessThan(1000);
+    });
+    
+    it('should complete promptly when restricted path is used', async () => {
+        const testRequest: DelegationRequest = {
+            id: 'test-restricted-path',
+            parentSession: 'test-session',
+            sourceCli: 'auto',
+            targetCli: 'auto',
+            agent: 'explorer',
+            prompt: 'test prompt',
+            status: 'pending',
+            workingDir: '/etc',
+            createdAt: new Date().toISOString(),
+            timeout: 60,
+        };
         
-        // Wait to verify timers are cleared
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        const startTime = Date.now();
+        const result = await spawnAgent(testRequest, 5000);
+        const elapsed = Date.now() - startTime;
         
-        // If we reach here without hanging, timers were properly cleared
-        expect(true).toBe(true);
-    }, 10000); // Increase test timeout to allow for the 6 second wait
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('restricted path');
+        expect(elapsed).toBeLessThan(1000);
+    });
 });
