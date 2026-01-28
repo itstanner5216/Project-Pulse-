@@ -514,10 +514,8 @@ describe('daemon - concurrent start attempts', () => {
             fs.writeSync(fd, '22222');
             fs.closeSync(fd);
             
-            // Read file immediately to avoid race condition
-            const fileExists = fs.existsSync(pidPath);
+            // Read file once to avoid race condition (don't check existence separately)
             const pidContent = fs.readFileSync(pidPath, 'utf-8');
-            expect(fileExists).toBe(true);
             expect(pidContent).toBe('22222');
         });
 
