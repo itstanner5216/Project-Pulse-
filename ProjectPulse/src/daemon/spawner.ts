@@ -149,10 +149,13 @@ function validateWorkingDir(dir: string): string {
         // Use lstat to check symlink itself, not target
         stats = fsSync.lstatSync(absPath);
     } catch {
+        const createCommand = process.platform === 'win32'
+            ? `New-Item -ItemType Directory -Path "${absPath}"`
+            : `mkdir -p "${absPath}"`;
         throw new Error(
             `Working directory does not exist: "${dir}". ` +
             `Please ensure the directory exists before creating a delegation request. ` +
-            `You may need to create it with: mkdir -p "${absPath}"`
+            `You may need to create it with: ${createCommand}`
         );
     }
     
