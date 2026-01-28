@@ -181,23 +181,30 @@ describe('spawner - workingDir validation', () => {
         });
 
         it('should handle symlinks to valid directories', async () => {
+            // Skip on Windows where symlinks require admin privileges
+            if (process.platform === 'win32') {
+                // Check if we can create symlinks
+                const testSymlink = path.join(tempDir, '.symlink-test');
+                try {
+                    fs.symlinkSync(tempDir, testSymlink, 'dir');
+                    fs.unlinkSync(testSymlink);
+                } catch {
+                    console.log('Skipping symlink test: requires admin privileges on Windows');
+                    return;
+                }
+            }
+            
             const targetDir = path.join(tempDir, 'target');
             const symlinkDir = path.join(tempDir, 'symlink');
             fs.mkdirSync(targetDir);
             
-            try {
-                fs.symlinkSync(targetDir, symlinkDir, 'dir');
-                
-                testRequest.workingDir = symlinkDir;
-                const result = await spawnAgent(testRequest, 5000);
-                
-                expect(result.stderr).not.toMatch(/Working directory does not exist/);
-                expect(result.stderr).not.toMatch(/Working directory is not a directory/);
-            } catch (error) {
-                // Symlink creation might fail on some systems (Windows without admin)
-                // Skip this test in that case
-                console.log('Skipping symlink test:', error);
-            }
+            fs.symlinkSync(targetDir, symlinkDir, 'dir');
+            
+            testRequest.workingDir = symlinkDir;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
+            expect(result.stderr).not.toMatch(/Working directory is not a directory/);
         });
     });
 

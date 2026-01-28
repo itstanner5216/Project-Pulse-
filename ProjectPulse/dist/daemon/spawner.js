@@ -128,7 +128,9 @@ function validateWorkingDir(dir) {
         ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
         : ['/root', '/etc', '/sys', '/proc', '/dev'];
     for (const sensitiveDir of sensitiveDirs) {
-        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+        const comparePath = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
+        const compareSensitive = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+        if (comparePath === compareSensitive || comparePath.startsWith(compareSensitive + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
         }
     }
@@ -174,10 +176,12 @@ function validateWorkingDir(dir) {
 }
 /**
  * Load agent prompt content from agentprompts/ directory.
+ *
+ * @param agent - The agent type to load the prompt for
+ * @param validWorkingDir - Already validated working directory path
+ * @returns The agent prompt content as a string
  */
-async function loadAgentPrompt(agent, workingDir) {
-    // Validate working directory before using it
-    const validWorkingDir = validateWorkingDir(workingDir);
+async function loadAgentPrompt(agent, validWorkingDir) {
     // Look for agentprompts/ in the project root
     const possiblePaths = [
         path.join(validWorkingDir, 'agentprompts', types_1.AGENT_FILES[agent]),

@@ -234,6 +234,8 @@ describe('DelegationWatcher - error handling and cleanup', () => {
             ]);
 
             // Should only be picked up once due to processing set
+            // Note: May occasionally be 0 due to race conditions where file is deleted
+            // before processRequest completes, but should never exceed 1
             expect(pickupCallback.mock.calls.length).toBeLessThanOrEqual(1);
             
             // Clean up
