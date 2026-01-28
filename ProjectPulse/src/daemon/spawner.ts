@@ -8,6 +8,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 import { DelegationRequest, SupportedCli, AGENT_FILES, AgentType } from '../lib/delegation/types';
 
 // ============================================================================
@@ -105,13 +106,85 @@ async function detectCli(): Promise<Exclude<SupportedCli, 'auto'> | null> {
 }
 
 /**
+ * Validate and sanitize a working directory path.
+ * 
+ * @param dir - The working directory path to validate
+ * @returns The absolute, validated path
+ * @throws Error if the path is invalid, doesn't exist, isn't a directory, or is in a restricted location
+ */
+function validateWorkingDir(dir: string): string {
+    // Resolve to absolute path
+    const absPath = path.resolve(dir);
+    
+    // Prevent execution in sensitive system directories (check before existence)
+    // This is intentional - we want to reject sensitive paths even if they don't exist
+    const sensitiveDirs = process.platform === 'win32'
+        ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
+        : ['/root', '/etc', '/sys', '/proc', '/dev'];
+    
+    // Windows paths are case-insensitive, normalize for comparison
+    const normalizedAbsPath = process.platform === 'win32' ? absPath.toLowerCase() : absPath;
+    
+    for (const sensitiveDir of sensitiveDirs) {
+        const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+        if (normalizedAbsPath === normalizedSensitiveDir || normalizedAbsPath.startsWith(normalizedSensitiveDir + path.sep)) {
+            throw new Error(`Working directory is in restricted path: ${dir}`);
+        }
+    }
+    
+    // Check if path exists
+    let stats;
+    try {
+        // Use lstat to check symlink itself, not target
+        stats = fsSync.lstatSync(absPath);
+    } catch (error) {
+        throw new Error(`Working directory does not exist: ${dir}`);
+    }
+    
+    // For symlinks, also validate the real path
+    if (stats.isSymbolicLink()) {
+        try {
+            const realPath = fsSync.realpathSync(absPath);
+            const normalizedRealPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+            // Check if real path is in sensitive directory
+            for (const sensitiveDir of sensitiveDirs) {
+                const normalizedSensitiveDir = process.platform === 'win32' ? sensitiveDir.toLowerCase() : sensitiveDir;
+                if (normalizedRealPath === normalizedSensitiveDir || normalizedRealPath.startsWith(normalizedSensitiveDir + path.sep)) {
+                    throw new Error(`Working directory symlink points to restricted path: ${dir}`);
+                }
+            }
+            // Check if real path is a directory
+            const realStats = fsSync.statSync(realPath);
+            if (!realStats.isDirectory()) {
+                throw new Error(`Working directory is not a directory: ${dir}`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('restricted path')) {
+                throw error;
+            }
+            throw new Error(`Working directory symlink is broken: ${dir}`);
+        }
+    } else {
+        // Verify it's a directory
+        if (!stats.isDirectory()) {
+            throw new Error(`Working directory is not a directory: ${dir}`);
+        }
+    }
+    
+    return absPath;
+}
+
+/**
  * Load agent prompt content from agentprompts/ directory.
  */
 async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<string> {
+    // Validate working directory before using it
+    const validWorkingDir = validateWorkingDir(workingDir);
+    
     // Look for agentprompts/ in the project root
     const possiblePaths = [
-        path.join(workingDir, 'agentprompts', AGENT_FILES[agent]),
-        path.join(workingDir, '..', 'agentprompts', AGENT_FILES[agent]),
+        path.join(validWorkingDir, 'agentprompts', AGENT_FILES[agent]),
+        path.join(validWorkingDir, '..', 'agentprompts', AGENT_FILES[agent]),
         path.join(process.cwd(), 'agentprompts', AGENT_FILES[agent]),
     ];
 
@@ -143,6 +216,19 @@ export async function spawnAgent(
     request: DelegationRequest,
     timeoutMs: number
 ): Promise<SpawnResult> {
+    // Validate working directory before using it
+    let validWorkingDir: string;
+    try {
+        validWorkingDir = validateWorkingDir(request.workingDir);
+    } catch (error) {
+        return {
+            stdout: '',
+            stderr: error instanceof Error ? error.message : 'Invalid working directory',
+            exitCode: 1,
+            timedOut: false,
+        };
+    }
+    
     // Determine which CLI to use
     let cli: Exclude<SupportedCli, 'auto'>;
 
@@ -170,7 +256,7 @@ export async function spawnAgent(
     }
 
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    const agentContent = await loadAgentPrompt(request.agent, validWorkingDir);
 
     // Build command
     const config = CLI_CONFIGS[cli];
@@ -181,9 +267,10 @@ export async function spawnAgent(
         let stderr = '';
         let timedOut = false;
         let finished = false;
+        let forceKillHandle: NodeJS.Timeout | null = null;
 
         const proc: ChildProcess = spawn(config.command, args, {
-            cwd: request.workingDir,
+            cwd: validWorkingDir,
             env: {
                 ...process.env,
                 // Inject ProjectPulse session ID for tracking
@@ -213,7 +300,7 @@ export async function spawnAgent(
                 proc.kill('SIGTERM');
 
                 // Force kill after 5 seconds
-                setTimeout(() => {
+                forceKillHandle = setTimeout(() => {
                     if (!finished) {
                         proc.kill('SIGKILL');
                     }
@@ -225,6 +312,9 @@ export async function spawnAgent(
         proc.on('close', (code) => {
             finished = true;
             clearTimeout(timeoutHandle);
+            if (forceKillHandle) {
+                clearTimeout(forceKillHandle);
+            }
 
             resolve({
                 stdout,
@@ -237,6 +327,9 @@ export async function spawnAgent(
         proc.on('error', (err) => {
             finished = true;
             clearTimeout(timeoutHandle);
+            if (forceKillHandle) {
+                clearTimeout(forceKillHandle);
+            }
 
             resolve({
                 stdout,
