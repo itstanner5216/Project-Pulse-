@@ -137,9 +137,6 @@ describe('DelegationWatcher - error handling and cleanup', () => {
             const watcherInstance = (watcher as any).watcher;
             
             if (watcherInstance) {
-                // Verify polling is not yet started (or is for initial scan)
-                const pollTimerBefore = (watcher as any).pollTimer;
-                
                 // Emit an error
                 watcherInstance.emit('error', new Error('Test error'));
                 
@@ -253,13 +250,11 @@ describe('DelegationWatcher - error handling and cleanup', () => {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify resources are active
-            const watcherBefore = (watcher as any).watcher;
             const runningBefore = (watcher as any).running;
             
             expect(runningBefore).toBe(true);
 
             // Stop the watcher
-            watcher.stop();
 
             // Verify resources are cleaned up
             expect((watcher as any).watcher).toBeNull();

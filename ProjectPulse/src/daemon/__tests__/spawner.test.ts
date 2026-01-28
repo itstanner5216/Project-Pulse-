@@ -10,7 +10,7 @@ import { EventEmitter } from 'events';
 
 // We need to test the validateWorkingDir function which is internal
 // So we'll import the module and test through the public API
-import { spawnAgent, SpawnResult } from '../spawner';
+import { spawnAgent } from '../spawner';
 import { DelegationRequest } from '../../lib/delegation/types';
 
 // Mock child_process to prevent real CLI execution

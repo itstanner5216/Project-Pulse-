@@ -213,7 +213,6 @@ describe('daemon - process existence check', () => {
             const { pidPath } = getPaths(tempDir);
             
             // Mock process.kill to throw ESRCH
-            const originalKill = process.kill;
             vi.spyOn(process, 'kill').mockImplementation((pid: number, signal?: string | number) => {
                 const error: any = new Error('No such process');
                 error.code = 'ESRCH';

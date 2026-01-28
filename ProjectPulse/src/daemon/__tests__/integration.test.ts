@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { DelegationWatcher } from '../watcher';
 import { 
     createRequest, 
@@ -23,7 +23,6 @@ import {
     ensureDirs,
     getDelegationsDir,
     getSubdir,
-    readRequest,
     listPending,
     listComplete,
 } from '../../lib/delegation/storage';
@@ -55,16 +54,6 @@ async function waitFor(
  * Wait for a file to exist
  */
 async function waitForFile(filePath: string, timeoutMs = 5000): Promise<void> {
-    await waitFor(() => fs.existsSync(filePath), timeoutMs);
-}
-
-/**
- * Wait for a file to be deleted
- */
-async function waitForFileDeleted(filePath: string, timeoutMs = 5000): Promise<void> {
-    await waitFor(() => !fs.existsSync(filePath), timeoutMs);
-}
-
 // ============================================================================
 // Test Suite
 // ============================================================================
