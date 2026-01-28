@@ -332,14 +332,6 @@ Creates:
 Agent prompts are loaded from the `agentprompts/` directory in the project root.
 
 **Default Locations**:
-```
-agentprompts/
-├── ExplorationAgent.md          # explorer agent
-├── CodingAgenticReviewer.md     # reviewer agent
-├── AutonomousPerformance.md     # performance agent
-├── System_Prompt_Autonomous_Architect.md  # architect agent
-└── PlanningAgent.md             # planner agent
-```
 
 **Customization**:
 1. Copy agent file to your project's `agentprompts/` directory
