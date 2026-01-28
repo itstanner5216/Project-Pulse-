@@ -134,23 +134,9 @@ jobs:
         working-directory: ProjectPulse
         run: npm run build
       
-      - name: Run smoke tests
+      - name: Run integration tests
         working-directory: ProjectPulse
-        run: |
-          if [ -f tests/smoke.sh ]; then
-            bash tests/smoke.sh
-          else
-            echo "No smoke tests found, skipping"
-          fi
-      
-      - name: Run integration test script
-        working-directory: ProjectPulse
-        run: |
-          if [ -f tests/run_tests.sh ]; then
-            bash tests/run_tests.sh
-          else
-            echo "No integration test script found, skipping"
-          fi
+        run: npm test -- --run src/daemon/__tests__/integration.test.ts
       
       - name: Report Integration Test Results
         if: always()
