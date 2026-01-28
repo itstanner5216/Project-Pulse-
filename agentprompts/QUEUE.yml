@@ -31,7 +31,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#1-missing-validation-of-workingdir-path"
           - "FOLLOWUP_TASKS.md#task-1-add-workingdir-path-validation"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Create a validateWorkingDir() function that resolves path to absolute form"
           - "Verify path exists and is a directory"
@@ -134,7 +134,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#5-watcher-falls-back-to-polling-without-cleanup"
           - "FOLLOWUP_TASKS.md#task-5-close-watcher-before-polling-fallback"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Close watcher in error handler before calling startPolling()"
           - "Set watcher to null after closing"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 14
+    todo: 12
     doing: 0
-    done: 0
+    done: 2
     blocked: 0
 
 # Workflow notes

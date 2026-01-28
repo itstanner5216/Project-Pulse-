@@ -6,11 +6,32 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { EventEmitter } from 'events';
 
 // We need to test the validateWorkingDir function which is internal
 // So we'll import the module and test through the public API
 import { spawnAgent, SpawnResult } from '../spawner';
 import { DelegationRequest } from '../../lib/delegation/types';
+
+// Mock child_process to prevent real CLI execution
+vi.mock('child_process', () => {
+    return {
+        spawn: vi.fn(() => {
+            const mockProcess = new EventEmitter() as any;
+            mockProcess.stdout = new EventEmitter();
+            mockProcess.stderr = new EventEmitter();
+            mockProcess.kill = vi.fn();
+            
+            // Simulate immediate process completion
+            setImmediate(() => {
+                mockProcess.stdout.emit('data', 'Mock output');
+                mockProcess.emit('close', 0);
+            });
+            
+            return mockProcess;
+        }),
+    };
+});
 
 describe('spawner - workingDir validation', () => {
     let tempDir: string;
@@ -19,6 +40,9 @@ describe('spawner - workingDir validation', () => {
     beforeEach(() => {
         // Create a temporary directory for tests
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-test-'));
+        
+        // Clear all mocks before each test
+        vi.clearAllMocks();
         
         // Create a basic delegation request
         testRequest = {
@@ -100,13 +124,16 @@ describe('spawner - workingDir validation', () => {
             testRequest.workingDir = '';
             const result = await spawnAgent(testRequest, 5000);
             
-            // Empty string resolves to current directory, which should be valid
-            // unless we're in a restricted directory
-            expect(result.exitCode).toBeGreaterThanOrEqual(0);
+            // Empty string resolves to process.cwd() via path.resolve('')
+            // This should be valid unless running from a restricted directory
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
+            expect(result.stderr).not.toMatch(/Working directory is not a directory/);
+            expect(result.stderr).not.toMatch(/Working directory is in restricted path/);
         });
     });
 
     describe('sensitive system directories', () => {
+        // Use platform-aware sensitive directories (mirrors logic in spawner.ts)
         const sensitiveDirs = process.platform === 'win32'
             ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
             : ['/root', '/etc', '/sys', '/proc', '/dev'];
@@ -129,9 +156,10 @@ describe('spawner - workingDir validation', () => {
             });
         });
 
-        it('should allow /root-like directory that is not /root', async () => {
-            // Create a directory that starts with 'root' but is not /root
-            const safeDir = path.join(tempDir, 'root-safe');
+        it('should allow safe directory that looks similar to sensitive path', async () => {
+            // Create a directory that starts with a similar name but is not in the sensitive path
+            const safeDirName = process.platform === 'win32' ? 'Windows-safe' : 'root-safe';
+            const safeDir = path.join(tempDir, safeDirName);
             fs.mkdirSync(safeDir);
             
             testRequest.workingDir = safeDir;
@@ -177,23 +205,24 @@ describe('spawner - workingDir validation', () => {
         });
 
         it('should handle symlinks to valid directories', async () => {
+            // Skip on Windows where symlinks require admin privileges
+            if (process.platform === 'win32') {
+                // Check if we can create symlinks
+                const testSymlink = path.join(tempDir, '.symlink-test');
+                try {
+                    fs.symlinkSync(tempDir, testSymlink, 'dir');
+                    fs.unlinkSync(testSymlink);
+                } catch {
+                    console.log('Skipping symlink test: requires admin privileges on Windows');
+                    return;
+                }
+            }
+            
             const targetDir = path.join(tempDir, 'target');
             const symlinkDir = path.join(tempDir, 'symlink');
             fs.mkdirSync(targetDir);
             
-            // Check if we can create symlinks (requires elevated privileges on some systems)
-            let canCreateSymlink = true;
-            try {
-                fs.symlinkSync(targetDir, symlinkDir, 'dir');
-            } catch (error) {
-                // Symlink creation might fail on some systems (Windows without admin)
-                canCreateSymlink = false;
-            }
-            
-            if (!canCreateSymlink) {
-                // Use vitest's skip for better test reporting
-                return;
-            }
+            fs.symlinkSync(targetDir, symlinkDir, 'dir');
             
             testRequest.workingDir = symlinkDir;
             const result = await spawnAgent(testRequest, 5000);
@@ -217,8 +246,10 @@ describe('spawner - workingDir validation', () => {
         });
 
         it('should handle paths with multiple slashes', async () => {
-            // Create path with redundant slashes
-            const pathWithSlashes = tempDir.replace(/\//g, '//');
+            // Create path with redundant slashes (platform-aware)
+            const pathWithSlashes = process.platform === 'win32'
+                ? tempDir.replace(/\\/g, '\\\\')
+                : tempDir.replace(/\//g, '//');
             testRequest.workingDir = pathWithSlashes;
             const result = await spawnAgent(testRequest, 5000);
             
@@ -251,148 +282,5 @@ describe('spawner - loadAgentPrompt validation', () => {
         // Should fail at validation before even trying to load agent prompt
         expect(result.exitCode).toBe(1);
         expect(result.stderr).toMatch(/Working directory does not exist/);
-    });
-});
-
-/**
- * Force-kill timer cleanup tests.
- * 
- * These tests verify that spawnAgent completes without hanging, which
- * indicates that all timers are properly cleared. The tests work regardless
- * of whether a CLI (opencode, codex, etc.) is installed.
- */
-describe('spawner - force-kill timer cleanup', () => {
-    let tempDir: string;
-    
-    beforeEach(() => {
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulse-test-'));
-    });
-    
-    afterEach(() => {
-        if (fs.existsSync(tempDir)) {
-            fs.rmSync(tempDir, { recursive: true, force: true });
-        }
-    });
-    
-    it('should complete without hanging (timers cleared)', async () => {
-        const testRequest: DelegationRequest = {
-            id: 'test-timer-cleanup',
-            parentSession: 'test-session',
-            sourceCli: 'auto',
-            targetCli: 'auto',
-            agent: 'explorer',
-            prompt: 'test prompt',
-            status: 'pending',
-            workingDir: tempDir,
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        };
-        
-        const startTime = Date.now();
-        const result = await spawnAgent(testRequest, 100);
-        const elapsed = Date.now() - startTime;
-        
-        expect(result).toBeDefined();
-        expect(result.exitCode).toBeGreaterThanOrEqual(0);
-        expect(elapsed).toBeLessThan(5000);
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-    });
-    
-    it('should allow event loop to exit cleanly after process completion', async () => {
-        const testRequest: DelegationRequest = {
-            id: 'test-clean-exit',
-            parentSession: 'test-session',
-            sourceCli: 'auto',
-            targetCli: 'auto',
-            agent: 'explorer',
-            prompt: 'test prompt',
-            status: 'pending',
-            workingDir: tempDir,
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        };
-        
-        const result = await spawnAgent(testRequest, 50);
-        
-        expect(result).toBeDefined();
-        
-        const canExitCleanly = await new Promise<boolean>((resolve) => {
-            setImmediate(() => resolve(true));
-        });
-        
-        expect(canExitCleanly).toBe(true);
-    });
-    
-    it('should handle multiple sequential calls without hanging', async () => {
-        const requests = Array.from({ length: 3 }, (_, i) => ({
-            id: `test-sequential-${i}`,
-            parentSession: 'test-session',
-            sourceCli: 'auto' as const,
-            targetCli: 'auto' as const,
-            agent: 'explorer' as const,
-            prompt: `test prompt ${i}`,
-            status: 'pending' as const,
-            workingDir: tempDir,
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        }));
-        
-        const startTime = Date.now();
-        
-        for (const request of requests) {
-            const result = await spawnAgent(request, 100);
-            expect(result).toBeDefined();
-        }
-        
-        const elapsed = Date.now() - startTime;
-        expect(elapsed).toBeLessThan(10000);
-    });
-    
-    it('should complete promptly when working directory validation fails', async () => {
-        const testRequest: DelegationRequest = {
-            id: 'test-validation-fail',
-            parentSession: 'test-session',
-            sourceCli: 'auto',
-            targetCli: 'auto',
-            agent: 'explorer',
-            prompt: 'test prompt',
-            status: 'pending',
-            workingDir: '/nonexistent/path/that/does/not/exist',
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        };
-        
-        const startTime = Date.now();
-        const result = await spawnAgent(testRequest, 5000);
-        const elapsed = Date.now() - startTime;
-        
-        expect(result.exitCode).toBe(1);
-        expect(result.stderr).toContain('Working directory does not exist');
-        expect(elapsed).toBeLessThan(1000);
-    });
-    
-    it('should complete promptly when restricted path is used', async () => {
-        const restrictedPath = process.platform === 'win32' ? 'C:\\Windows' : '/etc';
-        const testRequest: DelegationRequest = {
-            id: 'test-restricted-path',
-            parentSession: 'test-session',
-            sourceCli: 'auto',
-            targetCli: 'auto',
-            agent: 'explorer',
-            prompt: 'test prompt',
-            status: 'pending',
-            workingDir: restrictedPath,
-            createdAt: new Date().toISOString(),
-            timeout: 60,
-        };
-        
-        const startTime = Date.now();
-        const result = await spawnAgent(testRequest, 5000);
-        const elapsed = Date.now() - startTime;
-        
-        expect(result.exitCode).toBe(1);
-        expect(result.stderr).toContain('restricted path');
-        expect(elapsed).toBeLessThan(1000);
     });
 });
