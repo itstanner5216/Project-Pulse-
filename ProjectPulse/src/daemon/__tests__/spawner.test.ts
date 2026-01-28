@@ -219,8 +219,10 @@ describe('spawner - workingDir validation', () => {
         });
 
         it('should handle paths with multiple slashes', async () => {
-            // Create path with redundant slashes
-            const pathWithSlashes = tempDir.replace(/\//g, '//');
+            // Create path with redundant separators (platform-aware)
+            // On Unix: /tmp/dir becomes /tmp//dir
+            // On Windows: C:\temp\dir becomes C:\temp\\dir
+            const pathWithSlashes = tempDir.split(path.sep).join(path.sep + path.sep);
             testRequest.workingDir = pathWithSlashes;
             const result = await spawnAgent(testRequest, 5000);
             
