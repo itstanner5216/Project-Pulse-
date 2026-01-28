@@ -189,14 +189,18 @@ describe('ID collision scenarios', () => {
     it('should have very low collision probability for generateUniqueId in rapid succession', () => {
         const ids = new Set<string>();
         const iterations = 10000;
-        
-        for (let i = 0; i < iterations; i++) {
-            ids.add(generateUniqueId());
+        const baseTime = 1700000000000;
+        let tick = 0;
+        const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseTime + tick++);
+        try {
+            for (let i = 0; i < iterations; i++) {
+                ids.add(generateUniqueId());
+            }
+        } finally {
+            nowSpy.mockRestore();
         }
         
-        // Should have very few collisions due to timestamp (allow for <1% collision rate)
-        // In extremely rapid succession, same millisecond can occur multiple times
-        expect(ids.size).toBeGreaterThan(iterations * 0.99);
+        expect(ids.size).toBe(iterations);
     });
 
     it('should handle collision detection by checking if ID already exists', () => {
