@@ -107,7 +107,9 @@ describe('spawner - workingDir validation', () => {
     });
 
     describe('sensitive system directories', () => {
-        const sensitiveDirs = ['/root', '/etc', '/sys', '/proc', '/dev'];
+        const sensitiveDirs = process.platform === 'win32'
+            ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
+            : ['/root', '/etc', '/sys', '/proc', '/dev'];
 
         sensitiveDirs.forEach((dir) => {
             it(`should reject ${dir} directory`, async () => {
