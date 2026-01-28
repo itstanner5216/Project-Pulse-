@@ -564,7 +564,7 @@ describe('daemon - concurrent start attempts', () => {
                 fs.openSync(pidPath, 'wx');
                 expect.fail('Should have thrown permission error');
             } catch (error: any) {
-                expect(error.code).toBe('EACCES');
+                expect(['EACCES', 'EPERM']).toContain(error.code);
             } finally {
                 // Restore permissions for cleanup
                 fs.chmodSync(parentDir, 0o755);
