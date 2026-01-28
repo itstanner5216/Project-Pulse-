@@ -188,7 +188,7 @@ describe('Performance: ID Generation', () => {
             const startTime = performance.now();
             
             // Generate IDs in concurrent batches
-            const promises = Array.from({ length: batches }, () =>
+            const promises = Array.from({ length: batches }, async () =>
                 Promise.resolve().then(() => {
                     for (let i = 0; i < batchSize; i++) {
                         ids.add(generateUniqueId());
@@ -299,6 +299,10 @@ describe('Performance: File Watcher', () => {
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
                 timeout: 5000,
+                parentSession: 'perf-test',
+                sourceCli: 'copilot' as any,
+                targetCli: 'copilot' as any,
+                prompt: 'test',
             });
 
             // Wait for pickup with timeout
@@ -327,6 +331,10 @@ describe('Performance: File Watcher', () => {
                     agent: 'test-agent' as any,
                     workingDir: tempDir,
                     timeout: 5000,
+                    parentSession: 'perf-test',
+                    sourceCli: 'copilot' as any,
+                    targetCli: 'copilot' as any,
+                    prompt: 'test',
                 });
             });
             times.push(time);
@@ -351,6 +359,10 @@ describe('Performance: File Watcher', () => {
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
                 timeout: 5000,
+                parentSession: 'perf-test',
+                sourceCli: 'copilot' as any,
+                targetCli: 'copilot' as any,
+                prompt: 'test',
             });
         }
         
@@ -476,11 +488,15 @@ describe('Performance: Large Repository Handling', () => {
             
             for (let batch = 0; batch < batches; batch++) {
                 const batchRequests = Math.min(batchSize, requestCount - batch * batchSize);
-                const promises = Array.from({ length: batchRequests }, () =>
+                const promises = Array.from({ length: batchRequests }, async () =>
                     createRequest({
                         agent: 'test-agent' as any,
                         workingDir: tempDir,
                         timeout: 1000,
+                        parentSession: 'perf-test',
+                        sourceCli: 'copilot' as any,
+                        targetCli: 'copilot' as any,
+                        prompt: 'test',
                     })
                 );
                 await Promise.all(promises);
@@ -537,8 +553,10 @@ describe('Performance: Memory Overhead', () => {
         process.env.PROJECTPULSE_DELEGATIONS_DIR = tempDir;
         
         // Force GC if available
-        if (global.gc) {
-            global.gc();
+        // eslint-disable-next-line no-undef
+        if ((global as any).gc) {
+            // eslint-disable-next-line no-undef
+            (global as any).gc();
         }
     });
 
@@ -578,13 +596,19 @@ describe('Performance: Memory Overhead', () => {
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
                 timeout: 5000,
+                parentSession: 'perf-test',
+                sourceCli: 'copilot' as any,
+                targetCli: 'copilot' as any,
+                prompt: 'test',
             });
-            await deleteRequest(request.id);
+            await deleteRequest(request.data!.id);
         }
         
         // Force GC if available
-        if (global.gc) {
-            global.gc();
+        // eslint-disable-next-line no-undef
+        if ((global as any).gc) {
+            // eslint-disable-next-line no-undef
+            (global as any).gc();
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
@@ -652,9 +676,13 @@ describe('Performance: Request Processing', () => {
                     agent: 'test-agent' as any,
                     workingDir: tempDir,
                     timeout: 5000,
+                    parentSession: 'perf-test',
+                    sourceCli: 'copilot' as any,
+                    targetCli: 'copilot' as any,
+                    prompt: 'test',
                 });
                 // Clean up
-                if (createResult.ok) {
+                if (createResult.ok && createResult.data) {
                     await deleteRequest(createResult.data.id);
                 }
             });
@@ -676,6 +704,10 @@ describe('Performance: Request Processing', () => {
             agent: 'test-agent' as any,
             workingDir: tempDir,
             timeout: 5000,
+            parentSession: 'perf-test',
+            sourceCli: 'copilot' as any,
+            targetCli: 'copilot' as any,
+            prompt: 'test',
         });
         
         expect(createResult.ok).toBe(true);
