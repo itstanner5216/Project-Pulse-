@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/lib/delegation/index.ts", "src/daemon/index.ts", "src/commands/index.ts"],
+  "out": "docs/api",
+  "plugin": [],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "readme": "docs/README.md",
+  "name": "ProjectPulse API Documentation",
+  "includeVersion": true,
+  "searchInComments": true,
+  "customCss": "docs/typedoc-custom.css",
+  "customJs": "docs/typedoc-init.js",
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "inherited": true,
+    "external": false
+  }
+}

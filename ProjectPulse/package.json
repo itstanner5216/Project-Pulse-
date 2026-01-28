@@ -1,6 +1,7 @@
 {
     "name": "projectpulse",
     "version": "0.1.0",
+    "type": "module",
     "description": "IDE-like project awareness for AI agents",
     "main": "dist/index.js",
     "bin": {
@@ -12,7 +13,9 @@
         "dev": "tsc --watch",
         "lint": "eslint src/**/*.ts",
         "test": "vitest",
-        "clean": "rm -rf dist"
+        "clean": "rm -rf dist",
+        "docs": "typedoc",
+        "docs:watch": "typedoc --watch"
     },
     "keywords": [
         "ai",
@@ -24,9 +27,16 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@types/node": "^20.0.0",
+        "@eslint/js": "^9.39.2",
+        "@types/node": "^20.19.30",
+        "@typescript-eslint/eslint-plugin": "^8.54.0",
+        "@typescript-eslint/parser": "^8.54.0",
+        "@vitest/coverage-v8": "^4.0.18",
+        "eslint": "^9.39.2",
+        "eslint-plugin-security": "^3.0.1",
+        "typedoc": "^0.28.16",
         "typescript": "^5.0.0",
-        "vitest": "^1.0.0"
+        "vitest": "^4.0.18"
     },
     "engines": {
         "node": ">=18.0.0"

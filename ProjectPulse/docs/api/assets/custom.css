@@ -1,0 +1,25 @@
+/**
+ * Custom CSS for TypeDoc to fix theme color variables and accessibility
+ */
+
+/* Fix alert color variables for explicit theme overrides */
+:root[data-theme="light"] {
+  --color-alert-note: var(--light-color-note);
+  --color-alert-tip: var(--light-color-tip);
+  --color-alert-important: var(--light-color-important);
+  --color-alert-warning: var(--light-color-warning);
+  --color-alert-caution: var(--light-color-caution);
+}
+
+:root[data-theme="dark"] {
+  --color-alert-note: var(--dark-color-note);
+  --color-alert-tip: var(--dark-color-tip);
+  --color-alert-important: var(--dark-color-important);
+  --color-alert-warning: var(--dark-color-warning);
+  --color-alert-caution: var(--dark-color-caution);
+}
+
+/* Accessibility fix: Use visibility instead of display:none */
+html:not(.td-ready) body {
+  visibility: hidden;
+}

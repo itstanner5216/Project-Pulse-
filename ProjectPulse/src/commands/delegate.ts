@@ -8,7 +8,7 @@
  * Returns a delegation ID that can be used to retrieve results.
  */
 
-import { createRequest, ok, err, AgentType, SupportedCli, AGENT_FILES } from '../lib/delegation';
+import { createRequest, err, AgentType, SupportedCli, AGENT_FILES } from '../lib/delegation';
 
 // ============================================================================
 // Types

@@ -6,7 +6,6 @@
  */
 
 import { watch, promises as fs, FSWatcher } from 'fs';
-import * as path from 'path';
 import { getSubdir, readRequest, deleteRequest, writeResult } from '../lib/delegation/storage';
 import { DelegationRequest, DelegationResult, DEFAULT_TIMEOUT_MS } from '../lib/delegation/types';
 import { spawnAgent } from './spawner';
@@ -19,11 +18,11 @@ export interface WatcherOptions {
     /** Polling interval if watch is unavailable (ms) */
     pollInterval?: number;
     /** Callback when a request is picked up */
-    onPickup?: (request: DelegationRequest) => void;
+    onPickup?: (_request: DelegationRequest) => void;
     /** Callback when processing completes */
-    onComplete?: (result: DelegationResult) => void;
+    onComplete?: (_result: DelegationResult) => void;
     /** Callback on error */
-    onError?: (error: Error, requestId?: string) => void;
+    onError?: (_error: Error, _requestId?: string) => void;
 }
 
 // ============================================================================
@@ -60,17 +59,33 @@ export class DelegationWatcher {
 
         // Try native watch first
         try {
-            this.watcher = watch(this.pendingDir, async (eventType, filename) => {
+            this.watcher = watch(this.pendingDir, (eventType, filename) => {
                 if (eventType === 'rename' && filename?.endsWith('.json')) {
                     const id = filename.replace('.json', '');
-                    await this.processRequest(id);
+                    void this.processRequest(id);
                 }
             });
 
             this.watcher.on('error', (err) => {
-                this.options.onError(err);
+                // Close and clean up the broken watcher before falling back
+                // Do this BEFORE calling onError callback to ensure cleanup happens
+                // even if the callback throws
+                if (this.watcher) {
+                    try {
+                        this.watcher.close();
+                    } catch {
+                        // Ignore close errors - watcher may already be in error state
+                    }
+                    this.watcher = null;
+                }
+                
+                if (!this.running) return;
+
                 // Fall back to polling on watch error
                 this.startPolling();
+                
+                // Call error callback last, so cleanup happens even if it throws
+                this.options.onError(err);
             });
         } catch {
             // Fall back to polling if watch fails
@@ -104,8 +119,8 @@ export class DelegationWatcher {
     private startPolling(): void {
         if (this.pollTimer) return;
 
-        this.pollTimer = setInterval(async () => {
-            await this.pollOnce();
+        this.pollTimer = setInterval(() => {
+            void this.pollOnce();
         }, this.options.pollInterval);
     }
 

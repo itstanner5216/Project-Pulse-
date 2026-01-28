@@ -14,6 +14,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { DelegationWatcher } from './watcher';
 import { getDelegationsDir } from '../lib/delegation/storage';
+import { initLogger, Logger } from '../lib/logger';
 
 // ============================================================================
 // Constants
@@ -34,18 +35,23 @@ function getPidPath(): string {
     return path.join(getDelegationsDir(), PID_FILE);
 }
 
-async function log(message: string): Promise<void> {
-    const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] ${message}\n`;
-
-    try {
-        const logPath = getLogPath();
-        await fs.mkdir(path.dirname(logPath), { recursive: true });
-        await fs.appendFile(logPath, line);
-    } catch {
-        // Fall back to console
-        console.log(line.trim());
-    }
+/**
+ * Initialize the daemon logger with structured logging.
+ */
+function initDaemonLogger(): Logger {
+    const logLevel = process.env.LOG_LEVEL;
+    const validLevels: Array<'DEBUG' | 'INFO' | 'WARN' | 'ERROR'> = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    const minLevel = logLevel && validLevels.includes(logLevel as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR') 
+        ? (logLevel as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR')
+        : 'INFO';
+    
+    return initLogger({
+        logPath: getLogPath(),
+        minLevel,
+        format: process.env.LOG_FORMAT === 'json' ? 'json' : 'text',
+        maxSize: 10 * 1024 * 1024, // 10MB
+        maxFiles: 5,
+    });
 }
 
 // ============================================================================
@@ -77,6 +83,14 @@ async function removePid(): Promise<void> {
 
 /**
  * Check if the daemon is already running.
+ * 
+ * This function uses `process.kill(pid, 0)` to check process existence.
+ * On POSIX systems, this can return different error codes:
+ * - ESRCH: Process doesn't exist (we clean up stale PID file)
+ * - EPERM: Process exists but is owned by another user (daemon is running)
+ * 
+ * This distinction is important in multi-user scenarios where the daemon
+ * might be running as a different user (e.g., root vs regular user).
  */
 export async function isRunning(): Promise<boolean> {
     const pid = await readPid();
@@ -86,10 +100,22 @@ export async function isRunning(): Promise<boolean> {
         // Send signal 0 to check if process exists
         process.kill(pid, 0);
         return true;
-    } catch {
-        // Process doesn't exist, clean up stale PID file
-        await removePid();
-        return false;
+    } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        
+        if (err.code === 'ESRCH') {
+            // Process doesn't exist - clean up stale PID file
+            await removePid();
+            return false;
+        } else if (err.code === 'EPERM') {
+            // Process exists but we don't have permission to signal it
+            // This means daemon IS running (just owned by another user)
+            return true;
+        } else {
+            // Unexpected error - clean up and assume not running for safety
+            await removePid();
+            return false;
+        }
     }
 }
 
@@ -100,7 +126,10 @@ export async function isRunning(): Promise<boolean> {
 let watcher: DelegationWatcher | null = null;
 
 /**
- * Start the daemon.
+ * Start the delegation daemon if it is not already running.
+ *
+ * Creates and writes the daemon PID file, instantiates and starts a DelegationWatcher
+ * with logging callbacks, and registers signal handlers to perform a graceful shutdown.
  */
 export async function startDaemon(): Promise<void> {
     if (await isRunning()) {
@@ -108,35 +137,66 @@ export async function startDaemon(): Promise<void> {
         return;
     }
 
-    await log('Daemon starting...');
+    // Initialize structured logger
+    const logger = initDaemonLogger();
+    
+    logger.info('Daemon starting...', undefined, { pid: process.pid });
     await writePid();
 
     watcher = new DelegationWatcher({
         onPickup: (request) => {
-            log(`Picked up: ${request.id} (agent: ${request.agent})`);
+            logger.info(
+                `Picked up delegation request for ${request.agent} agent`,
+                request.id,
+                { 
+                    agent: request.agent,
+                    promptLength: request.prompt.length,
+                    workingDir: request.workingDir,
+                }
+            );
         },
         onComplete: (result) => {
-            log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
+            logger.info(
+                `Delegation completed with status: ${result.status}`,
+                result.id,
+                { 
+                    status: result.status,
+                    durationMs: result.durationMs,
+                    exitCode: result.exitCode,
+                }
+            );
         },
         onError: (error, id) => {
-            log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
+            logger.error(
+                `Delegation processing failed: ${error.message}`,
+                id,
+                { operation: 'delegation_processing' },
+                error
+            );
         },
     });
 
     // Handle shutdown signals
     const shutdown = async () => {
-        await log('Daemon shutting down...');
+        logger.info('Daemon received shutdown signal, stopping gracefully...');
         watcher?.stop();
         await removePid();
+        logger.info('Daemon shutdown complete');
+        
+        // Flush logs before exiting to ensure final messages are written
+        await logger.flush();
         process.exit(0);
     };
 
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
-    process.on('SIGHUP', shutdown);
+    process.on('SIGTERM', () => void shutdown());
+    process.on('SIGINT', () => void shutdown());
+    process.on('SIGHUP', () => void shutdown());
 
     await watcher.start();
-    await log('Daemon started, watching for delegations');
+    logger.info('Daemon started successfully, watching for delegations', undefined, {
+        logPath: getLogPath(),
+        pidPath: getPidPath(),
+    });
 
     console.log(`Delegation daemon started (PID: ${process.pid})`);
     console.log(`Log file: ${getLogPath()}`);
@@ -161,6 +221,7 @@ export async function stopDaemon(): Promise<boolean> {
         await new Promise((r) => setTimeout(r, 1000));
 
         if (await isRunning()) {
+            console.log('Daemon did not stop gracefully, sending SIGKILL');
             process.kill(pid, 'SIGKILL');
             console.log('Force killed daemon');
         }
@@ -168,7 +229,8 @@ export async function stopDaemon(): Promise<boolean> {
         await removePid();
         return true;
     } catch (error) {
-        console.log(`Failed to stop daemon: ${error}`);
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.log(`Failed to stop daemon (PID: ${pid}): ${err.message}`);
         await removePid();
         return false;
     }
