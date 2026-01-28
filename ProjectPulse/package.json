@@ -1,6 +1,7 @@
 {
     "name": "projectpulse",
     "version": "0.1.0",
+    "type": "module",
     "description": "IDE-like project awareness for AI agents",
     "main": "dist/index.js",
     "bin": {
