@@ -340,11 +340,6 @@ If daemon receives SIGTERM/SIGINT while processing:
 
 Daemon processes delegations **sequentially** (one at a time):
 
-```
-Request A → PENDING → RUNNING → COMPLETE
-Request B → PENDING → (wait) → RUNNING → COMPLETE
-Request C → PENDING → (wait) → (wait) → RUNNING → COMPLETE
-```
 
 This prevents resource contention and ensures stable execution.
 
