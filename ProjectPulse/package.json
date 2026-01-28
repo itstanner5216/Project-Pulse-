@@ -12,7 +12,9 @@
         "dev": "tsc --watch",
         "lint": "eslint src/**/*.ts",
         "test": "vitest",
-        "clean": "rm -rf dist"
+        "clean": "rm -rf dist",
+        "docs": "typedoc",
+        "docs:watch": "typedoc --watch"
     },
     "keywords": [
         "ai",
@@ -31,6 +33,7 @@
         "@vitest/coverage-v8": "^4.0.18",
         "eslint": "^9.39.2",
         "eslint-plugin-security": "^3.0.1",
+        "typedoc": "^0.28.16",
         "typescript": "^5.0.0",
         "vitest": "^4.0.0"
     },
