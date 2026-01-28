@@ -107,7 +107,10 @@ describe('spawner - workingDir validation', () => {
     });
 
     describe('sensitive system directories', () => {
-        const sensitiveDirs = ['/root', '/etc', '/sys', '/proc', '/dev'];
+        // Platform-aware sensitive directories (matches implementation in spawner.ts)
+        const sensitiveDirs = process.platform === 'win32'
+            ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
+            : ['/root', '/etc', '/sys', '/proc', '/dev'];
 
         sensitiveDirs.forEach((dir) => {
             it(`should reject ${dir} directory`, async () => {
@@ -127,9 +130,12 @@ describe('spawner - workingDir validation', () => {
             });
         });
 
-        it('should allow /root-like directory that is not /root', async () => {
-            // Create a directory that starts with 'root' but is not /root
-            const safeDir = path.join(tempDir, 'root-safe');
+        it('should allow safe directory that looks similar to restricted path', async () => {
+            // Create a directory that starts with similar name but is not restricted
+            // On Unix: 'root-safe' is not '/root'
+            // On Windows: 'Windows-safe' is not 'C:\Windows'
+            const safeDirName = process.platform === 'win32' ? 'Windows-safe' : 'root-safe';
+            const safeDir = path.join(tempDir, safeDirName);
             fs.mkdirSync(safeDir);
             
             testRequest.workingDir = safeDir;
