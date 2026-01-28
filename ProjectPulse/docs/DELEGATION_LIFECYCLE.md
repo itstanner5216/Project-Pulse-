@@ -4,7 +4,7 @@ This document describes the complete lifecycle of a delegation request in Projec
 
 ## State Machine
 
-```
+```text
 ┌─────────┐
 │ PENDING │ ─── Request created in pending/ directory
 └────┬────┘
@@ -365,7 +365,7 @@ projectpulse daemon stop
 
 Daemon logs all lifecycle events:
 
-```
+```text
 [2026-01-28T05:00:00.000Z] Daemon started
 [2026-01-28T05:00:01.000Z] Processing delegation: swift-amber-falcon
 [2026-01-28T05:00:02.000Z] Spawning CLI: opencode with agent: explorer

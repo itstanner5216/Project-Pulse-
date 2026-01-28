@@ -298,7 +298,7 @@ process.on('SIGTERM', async () => {
 - ✅ Human-readable and memorable
 - ✅ Easy to type and communicate
 - ✅ Sortable (alphabetically)
-- ✅ Collision-resistant (2304 combinations)
+- ✅ Collision-resistant (13,824 combinations)
 
 **Implementation**:
 ```typescript
