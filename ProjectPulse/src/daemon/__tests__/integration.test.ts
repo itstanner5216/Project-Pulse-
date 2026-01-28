@@ -50,10 +50,6 @@ async function waitFor(
     throw new Error(`Timeout waiting for condition after ${timeoutMs}ms`);
 }
 
-/**
- * Wait for a file to exist
- */
-async function waitForFile(filePath: string, timeoutMs = 5000): Promise<void> {
 // ============================================================================
 // Test Suite
 // ============================================================================

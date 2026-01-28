@@ -514,8 +514,10 @@ describe('daemon - concurrent start attempts', () => {
             fs.writeSync(fd, '22222');
             fs.closeSync(fd);
             
+            // Read file immediately after closing to avoid race condition
+            const pidContent = fs.readFileSync(pidPath, 'utf-8');
             expect(fs.existsSync(pidPath)).toBe(true);
-            expect(fs.readFileSync(pidPath, 'utf-8')).toBe('22222');
+            expect(pidContent).toBe('22222');
         });
 
         it('should handle EEXIST error correctly', async () => {

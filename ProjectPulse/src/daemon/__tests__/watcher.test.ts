@@ -255,6 +255,7 @@ describe('DelegationWatcher - error handling and cleanup', () => {
             expect(runningBefore).toBe(true);
 
             // Stop the watcher
+            watcher.stop();
 
             // Verify resources are cleaned up
             expect((watcher as any).watcher).toBeNull();
