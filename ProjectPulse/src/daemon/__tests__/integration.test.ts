@@ -107,14 +107,16 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
         it('should create, process, and read result for a delegation', async () => {
             // Mock child_process.spawn to simulate successful agent execution
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
-            const mockProcess = {
-                stdout: { on: vi.fn() },
-                stderr: { on: vi.fn() },
-                on: vi.fn(),
-                kill: vi.fn(),
-            } as unknown as ChildProcess;
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
+                const mockProcess = {
+                    stdout: { on: vi.fn() },
+                    stderr: { on: vi.fn() },
+                    on: vi.fn(),
+                    kill: vi.fn(),
+                } as unknown as ChildProcess;
+
                 // Simulate successful execution
                 setTimeout(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
@@ -205,18 +207,20 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
         it('should handle delegation with error status', async () => {
             // Mock spawn to simulate error
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
-            const mockProcess = {
-                stdout: { on: vi.fn() },
-                stderr: { on: vi.fn((event, callback) => {
-                    if (event === 'data') {
-                        setTimeout(() => callback(Buffer.from('Error message')), 50);
-                    }
-                }) },
-                on: vi.fn(),
-                kill: vi.fn(),
-            } as unknown as ChildProcess;
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
+                const mockProcess = {
+                    stdout: { on: vi.fn() },
+                    stderr: { on: vi.fn((event, callback) => {
+                        if (event === 'data') {
+                            setTimeout(() => callback(Buffer.from('Error message')), 50);
+                        }
+                    }) },
+                    on: vi.fn(),
+                    kill: vi.fn(),
+                } as unknown as ChildProcess;
+
                 setTimeout(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const closeHandler = onCallback.mock.calls.find(call => call[0] === 'close');
@@ -279,14 +283,16 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
 
             // Mock spawn for this test
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
-            const mockProcess = {
-                stdout: { on: vi.fn() },
-                stderr: { on: vi.fn() },
-                on: vi.fn(),
-                kill: vi.fn(),
-            } as unknown as ChildProcess;
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
+                const mockProcess = {
+                    stdout: { on: vi.fn() },
+                    stderr: { on: vi.fn() },
+                    on: vi.fn(),
+                    kill: vi.fn(),
+                } as unknown as ChildProcess;
+
                 setTimeout(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const closeHandler = onCallback.mock.calls.find(call => call[0] === 'close');
@@ -374,6 +380,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
             const processedIds = new Set<string>();
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
                 const mockProcess = {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn() },
@@ -452,6 +459,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
             const processCount = new Map<string, number>();
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
                 const mockProcess = {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn() },
@@ -520,6 +528,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
             const agentsProcessed = new Set<AgentType>();
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
                 const mockProcess = {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn() },
@@ -590,6 +599,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
 
             mockSpawn.mockImplementation(() => {
                 callCount++;
+                // Create a fresh mock process for each spawn call
                 const mockProcess = {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn() },
@@ -656,6 +666,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
                 const mockProcess = {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn() },
@@ -717,14 +728,16 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
     describe('File Watcher vs Polling Fallback', () => {
         it('should fallback to polling when watcher fails', async () => {
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
-            const mockProcess = {
-                stdout: { on: vi.fn() },
-                stderr: { on: vi.fn() },
-                on: vi.fn(),
-                kill: vi.fn(),
-            } as unknown as ChildProcess;
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
+                const mockProcess = {
+                    stdout: { on: vi.fn() },
+                    stderr: { on: vi.fn() },
+                    on: vi.fn(),
+                    kill: vi.fn(),
+                } as unknown as ChildProcess;
+
                 setTimeout(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const closeHandler = onCallback.mock.calls.find(call => call[0] === 'close');
@@ -788,14 +801,16 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
 
         it('should work with polling mode only', async () => {
             const mockSpawn = vi.spyOn(require('child_process'), 'spawn');
-            const mockProcess = {
-                stdout: { on: vi.fn() },
-                stderr: { on: vi.fn() },
-                on: vi.fn(),
-                kill: vi.fn(),
-            } as unknown as ChildProcess;
 
             mockSpawn.mockImplementation(() => {
+                // Create a fresh mock process for each spawn call
+                const mockProcess = {
+                    stdout: { on: vi.fn() },
+                    stderr: { on: vi.fn() },
+                    on: vi.fn(),
+                    kill: vi.fn(),
+                } as unknown as ChildProcess;
+
                 setTimeout(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const closeHandler = onCallback.mock.calls.find(call => call[0] === 'close');
