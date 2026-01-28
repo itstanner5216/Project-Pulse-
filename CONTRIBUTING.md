@@ -208,6 +208,89 @@ function validateWorkingDir(dir: string): string {
    - Provide actionable error messages
    - Log security-relevant events
 
+### ESLint Security Rules
+
+Project Pulse uses ESLint with security plugins to enforce coding standards and prevent common security vulnerabilities.
+
+#### Core Security Rules
+
+The following rules are enforced to prevent dangerous JavaScript patterns:
+
+1. **no-eval** (error): Prevents use of `eval()` which can execute arbitrary code
+2. **no-implied-eval** (error): Prevents `setTimeout()` and `setInterval()` with string arguments
+3. **no-new-func** (error): Prevents `new Function()` constructor which is similar to `eval()`
+
+#### TypeScript Security Rules
+
+TypeScript-specific rules for async/promise handling and error consistency:
+
+1. **@typescript-eslint/no-floating-promises** (error): Requires promises to be awaited or handled
+2. **@typescript-eslint/no-misused-promises** (error): Prevents promises in contexts expecting sync values
+3. **@typescript-eslint/promise-function-async** (error): Requires async functions for functions that return promises
+4. **@typescript-eslint/await-thenable** (error): Prevents await on non-promise values
+5. **@typescript-eslint/only-throw-error** (error): Ensures only Error objects are thrown
+
+#### Code Quality Rules
+
+1. **prefer-const** (error): Enforces use of `const` for variables that are never reassigned
+2. **@typescript-eslint/no-unused-vars** (error): Prevents unused variables (except those prefixed with `_`)
+
+#### Security Plugin Rules
+
+The `eslint-plugin-security` provides additional security checks:
+
+**Error-level violations:**
+- `security/detect-unsafe-regex`: Detects potentially catastrophic exponential-time regular expressions
+- `security/detect-buffer-noassert`: Detects Buffer calls without proper assertions
+- `security/detect-eval-with-expression`: Detects eval() with expressions
+- `security/detect-no-csrf-before-method-override`: Detects missing CSRF protection
+- `security/detect-disable-mustache-escape`: Detects disabled escaping in templates
+- `security/detect-pseudoRandomBytes`: Detects use of weak random number generators
+
+**Warning-level violations:**
+- `security/detect-object-injection`: Warns about potential object injection vulnerabilities
+- `security/detect-non-literal-fs-filename`: Warns about filesystem operations with dynamic paths
+- `security/detect-child-process`: Warns about subprocess spawning (legitimate use cases exist)
+- `security/detect-non-literal-regexp`: Warns about RegExp with dynamic patterns
+- `security/detect-non-literal-require`: Warns about require() with dynamic paths
+- `security/detect-possible-timing-attacks`: Warns about potential timing attack vulnerabilities
+
+#### Running ESLint
+
+```bash
+# Run ESLint on all TypeScript files
+cd ProjectPulse
+npm run lint
+
+# Auto-fix issues where possible
+npx eslint src/**/*.ts --fix
+```
+
+#### Handling Warnings
+
+Security warnings (like `detect-object-injection` or `detect-non-literal-fs-filename`) are acceptable when:
+1. The dynamic value comes from a trusted source
+2. Input validation is performed before the operation
+3. The operation is necessary for the application's functionality
+4. The risk is documented and understood
+
+**Example of acceptable warning:**
+```typescript
+// Warning: security/detect-non-literal-fs-filename
+// Acceptable because absPath is validated by validateWorkingDir()
+const absPath = validateWorkingDir(userInput); // Path validation happens here
+const stats = fs.statSync(absPath); // Safe to use validated path
+```
+
+#### Disabling Rules
+
+Only disable rules when absolutely necessary and document why:
+
+```typescript
+// eslint-disable-next-line security/detect-non-literal-require
+const plugin = require(pluginPath); // Safe: pluginPath validated in previous step
+```
+
 ## Testing Guidelines
 
 ### Unit Tests

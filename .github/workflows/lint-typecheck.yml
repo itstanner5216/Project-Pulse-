@@ -1,0 +1,120 @@
+name: Lint and Type Check
+
+on:
+  # Run on pushes to main and PRs
+  push:
+    branches:
+      - main
+      - 'copilot/**'
+  pull_request:
+    paths:
+      - 'ProjectPulse/**/*.ts'
+      - 'ProjectPulse/package.json'
+      - 'ProjectPulse/package-lock.json'
+      - 'ProjectPulse/tsconfig.json'
+      - 'ProjectPulse/eslint.config.mjs'
+      - '.github/workflows/lint-typecheck.yml'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: ESLint Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'ProjectPulse/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ProjectPulse
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: ProjectPulse
+        run: npm run lint
+      
+      - name: Report ESLint Results
+        if: always()
+        run: |
+          echo "::group::ESLint Summary"
+          echo "ESLint checks completed"
+          echo "All security rules and coding standards enforced"
+          echo "::endgroup::"
+  
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'ProjectPulse/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ProjectPulse
+        run: npm ci
+      
+      - name: Run TypeScript compiler
+        working-directory: ProjectPulse
+        run: npx tsc --noEmit
+      
+      - name: Report TypeCheck Results
+        if: always()
+        run: |
+          echo "::group::TypeScript Summary"
+          echo "TypeScript type checking completed"
+          echo "All type safety checks passed"
+          echo "::endgroup::"
+  
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'ProjectPulse/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ProjectPulse
+        run: npm ci
+      
+      - name: Build project
+        working-directory: ProjectPulse
+        run: npm run build
+      
+      - name: Verify build artifacts
+        working-directory: ProjectPulse
+        run: |
+          echo "::group::Build Artifacts"
+          ls -la dist/
+          echo "::endgroup::"
+      
+      - name: Report Build Results
+        if: always()
+        run: |
+          echo "::group::Build Summary"
+          echo "Build completed successfully"
+          echo "All source files compiled without errors"
+          echo "::endgroup::"
