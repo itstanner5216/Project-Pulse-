@@ -214,20 +214,21 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
                     stdout: { on: vi.fn() },
                     stderr: { on: vi.fn((event, callback) => {
                         if (event === 'data') {
-                            setTimeout(() => callback(Buffer.from('Error message')), 50);
+                            setImmediate(() => callback(Buffer.from('Error message')));
                         }
                     }) },
                     on: vi.fn(),
                     kill: vi.fn(),
                 } as unknown as ChildProcess;
 
-                setTimeout(() => {
+                // Use setImmediate to ensure handlers are registered before triggering
+                setImmediate(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const closeHandler = onCallback.mock.calls.find(call => call[0] === 'close');
                     if (closeHandler) {
                         closeHandler[1](1); // Exit code 1 (error)
                     }
-                }, 100);
+                });
                 return mockProcess;
             });
 
@@ -607,7 +608,8 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
                     kill: vi.fn(),
                 } as unknown as ChildProcess;
 
-                setTimeout(() => {
+                // Use setImmediate to ensure handlers are registered before triggering
+                setImmediate(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const errorHandler = onCallback.mock.calls.find(call => call[0] === 'error');
                     if (errorHandler && callCount === 1) {
@@ -620,7 +622,7 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
                             closeHandler[1](0);
                         }
                     }
-                }, 100);
+                });
                 return mockProcess;
             });
 
@@ -674,13 +676,14 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
                     kill: vi.fn(),
                 } as unknown as ChildProcess;
 
-                setTimeout(() => {
+                // Use setImmediate to ensure handlers are registered before triggering
+                setImmediate(() => {
                     const onCallback = mockProcess.on as unknown as ReturnType<typeof vi.fn>;
                     const errorHandler = onCallback.mock.calls.find(call => call[0] === 'error');
                     if (errorHandler) {
                         errorHandler[1](new Error('Process error'));
                     }
-                }, 100);
+                });
                 return mockProcess;
             });
 
@@ -762,6 +765,10 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
 
                 // Simulate watcher error to trigger polling fallback
                 const watcherInstance = (watcher as any).watcher;
+                
+                // Ensure watcher was created before testing fallback
+                expect(watcherInstance).not.toBeNull();
+                
                 if (watcherInstance) {
                     watcherInstance.emit('error', new Error('Watcher error'));
                     
@@ -884,16 +891,16 @@ describe('Integration Tests - Delegation Workflow and Daemon Lifecycle', () => {
             expect(fs.existsSync(getSubdir('logs'))).toBe(true);
         });
 
-        it('should clean up temp directory after test', async () => {
-            // Create some test files
-            const testFile = path.join(getSubdir('pending'), 'test-cleanup.json');
+        it('should create test files in isolated directory', async () => {
+            // Create some test files to verify isolation
+            const testFile = path.join(getSubdir('pending'), 'test-isolation.json');
             fs.writeFileSync(testFile, '{"test": "data"}');
 
             // Verify file exists
             expect(fs.existsSync(testFile)).toBe(true);
 
             // The afterEach hook will clean up the temp directory
-            // We just verify the file is there for now
+            // This test verifies that we can create files in the isolated environment
             expect(fs.existsSync(tempDir)).toBe(true);
         });
 
