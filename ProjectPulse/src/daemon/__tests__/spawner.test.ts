@@ -100,9 +100,9 @@ describe('spawner - workingDir validation', () => {
             testRequest.workingDir = '';
             const result = await spawnAgent(testRequest, 5000);
             
-            // Empty string resolves to current directory, which should be valid
-            // unless we're in a restricted directory
-            expect(result.exitCode).toBeGreaterThanOrEqual(0);
+            // Empty string resolves to current directory
+            // Should succeed unless we're in a restricted directory (unlikely in test env)
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
         });
     });
 
@@ -181,19 +181,25 @@ describe('spawner - workingDir validation', () => {
             const symlinkDir = path.join(tempDir, 'symlink');
             fs.mkdirSync(targetDir);
             
+            // Check if symlinks are supported before running test
+            let canCreateSymlink = true;
             try {
                 fs.symlinkSync(targetDir, symlinkDir, 'dir');
-                
-                testRequest.workingDir = symlinkDir;
-                const result = await spawnAgent(testRequest, 5000);
-                
-                expect(result.stderr).not.toMatch(/Working directory does not exist/);
-                expect(result.stderr).not.toMatch(/Working directory is not a directory/);
             } catch (error) {
                 // Symlink creation might fail on some systems (Windows without admin)
-                // Skip this test in that case
-                console.log('Skipping symlink test:', error);
+                canCreateSymlink = false;
             }
+            
+            if (!canCreateSymlink) {
+                // Skip test if symlinks not supported
+                return;
+            }
+            
+            testRequest.workingDir = symlinkDir;
+            const result = await spawnAgent(testRequest, 5000);
+            
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
+            expect(result.stderr).not.toMatch(/Working directory is not a directory/);
         });
     });
 

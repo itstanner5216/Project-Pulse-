@@ -94,7 +94,8 @@ const CLI_CONFIGS = {
  */
 async function commandExists(cmd) {
     return new Promise((resolve) => {
-        const proc = (0, child_process_1.spawn)('which', [cmd], { stdio: 'ignore' });
+        const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+        const proc = (0, child_process_1.spawn)(whichCmd, [cmd], { stdio: 'ignore' });
         proc.on('close', (code) => resolve(code === 0));
         proc.on('error', () => resolve(false));
     });
@@ -254,7 +255,7 @@ async function spawnAgent(request, timeoutMs) {
         }
     }
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    const agentContent = await loadAgentPrompt(request.agent, validWorkingDir);
     // Build command
     const config = CLI_CONFIGS[cli];
     const args = config.args(request.prompt, agentContent);
