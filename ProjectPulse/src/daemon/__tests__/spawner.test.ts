@@ -148,6 +148,33 @@ describe('spawner - workingDir validation', () => {
             // Should not fail with restricted path error
             expect(result.stderr).not.toMatch(/Working directory is in restricted path/);
         });
+
+        // Windows case-insensitivity tests
+        if (process.platform === 'win32') {
+            it('should reject Windows directory with different casing (c:\\windows)', async () => {
+                testRequest.workingDir = 'c:\\windows';
+                const result = await spawnAgent(testRequest, 5000);
+                
+                expect(result.exitCode).toBe(1);
+                expect(result.stderr).toMatch(/Working directory is in restricted path/);
+            });
+
+            it('should reject Windows\\System32 with mixed casing', async () => {
+                testRequest.workingDir = 'C:\\WiNdOwS\\sYsTeM32';
+                const result = await spawnAgent(testRequest, 5000);
+                
+                expect(result.exitCode).toBe(1);
+                expect(result.stderr).toMatch(/Working directory is in restricted path/);
+            });
+
+            it('should reject Program Files with lowercase', async () => {
+                testRequest.workingDir = 'c:\\program files';
+                const result = await spawnAgent(testRequest, 5000);
+                
+                expect(result.exitCode).toBe(1);
+                expect(result.stderr).toMatch(/Working directory is in restricted path/);
+            });
+        }
     });
 
     describe('edge cases', () => {

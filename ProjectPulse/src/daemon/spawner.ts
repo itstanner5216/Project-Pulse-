@@ -122,8 +122,19 @@ function validateWorkingDir(dir: string): string {
         ? ['C:\\Windows', 'C:\\Windows\\System32', 'C:\\Program Files']
         : ['/root', '/etc', '/sys', '/proc', '/dev'];
     
-    for (const sensitiveDir of sensitiveDirs) {
-        if (absPath === sensitiveDir || absPath.startsWith(sensitiveDir + path.sep)) {
+    // Helper function to normalize paths for comparison
+    // On Windows: normalize and lowercase for case-insensitive comparison
+    // On Unix: just normalize (paths are case-sensitive)
+    const normalizeForCompare = (p: string): string => {
+        const normalized = path.normalize(p);
+        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+    
+    const normalizedAbsPath = normalizeForCompare(absPath);
+    const normalizedSensitiveDirs = sensitiveDirs.map(normalizeForCompare);
+    
+    for (const sensitiveDir of normalizedSensitiveDirs) {
+        if (normalizedAbsPath === sensitiveDir || normalizedAbsPath.startsWith(sensitiveDir + path.sep)) {
             throw new Error(`Working directory is in restricted path: ${dir}`);
         }
     }
@@ -141,9 +152,10 @@ function validateWorkingDir(dir: string): string {
     if (stats.isSymbolicLink()) {
         try {
             const realPath = fsSync.realpathSync(absPath);
+            const normalizedRealPath = normalizeForCompare(realPath);
             // Check if real path is in sensitive directory
-            for (const sensitiveDir of sensitiveDirs) {
-                if (realPath === sensitiveDir || realPath.startsWith(sensitiveDir + path.sep)) {
+            for (const sensitiveDir of normalizedSensitiveDirs) {
+                if (normalizedRealPath === sensitiveDir || normalizedRealPath.startsWith(sensitiveDir + path.sep)) {
                     throw new Error(`Working directory symlink points to restricted path: ${dir}`);
                 }
             }
