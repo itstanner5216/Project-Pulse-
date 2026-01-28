@@ -250,7 +250,7 @@ export async function spawnAgent(
     }
 
     // Load agent prompt
-    const agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+    const agentContent = await loadAgentPrompt(request.agent, validWorkingDir);
 
     // Build command
     const config = CLI_CONFIGS[cli];

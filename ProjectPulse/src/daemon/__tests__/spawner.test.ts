@@ -100,9 +100,11 @@ describe('spawner - workingDir validation', () => {
             testRequest.workingDir = '';
             const result = await spawnAgent(testRequest, 5000);
             
-            // Empty string resolves to current directory, which should be valid
-            // unless we're in a restricted directory
-            expect(result.exitCode).toBeGreaterThanOrEqual(0);
+            // Empty string resolves to process.cwd() via path.resolve('')
+            // This should be valid unless running from a restricted directory
+            expect(result.stderr).not.toMatch(/Working directory does not exist/);
+            expect(result.stderr).not.toMatch(/Working directory is not a directory/);
+            expect(result.stderr).not.toMatch(/Working directory is in restricted path/);
         });
     });
 
@@ -213,8 +215,10 @@ describe('spawner - workingDir validation', () => {
         });
 
         it('should handle paths with multiple slashes', async () => {
-            // Create path with redundant slashes
-            const pathWithSlashes = tempDir.replace(/\//g, '//');
+            // Create path with redundant slashes (platform-aware)
+            const pathWithSlashes = process.platform === 'win32'
+                ? tempDir.replace(/\\/g, '\\\\')
+                : tempDir.replace(/\//g, '//');
             testRequest.workingDir = pathWithSlashes;
             const result = await spawnAgent(testRequest, 5000);
             

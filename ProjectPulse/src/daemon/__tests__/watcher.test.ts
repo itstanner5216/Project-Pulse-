@@ -186,9 +186,9 @@ describe('DelegationWatcher - error handling and cleanup', () => {
             // Wait for processing
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // The request should be picked up only once
+            // The request should be picked up exactly once
             // Even if both watcher and polling are running
-            expect(pickupCallback.mock.calls.length).toBeLessThanOrEqual(1);
+            expect(pickupCallback).toHaveBeenCalledTimes(1);
             
             // Clean up the request file if it still exists
             if (fs.existsSync(requestFile)) {
