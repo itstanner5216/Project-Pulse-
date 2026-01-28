@@ -83,7 +83,8 @@ const CLI_CONFIGS: Record<Exclude<SupportedCli, 'auto'>, CliConfig> = {
  */
 async function commandExists(cmd: string): Promise<boolean> {
     return new Promise((resolve) => {
-        const proc = spawn('which', [cmd], { stdio: 'ignore' });
+        const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+        const proc = spawn(whichCmd, [cmd], { stdio: 'ignore' });
         proc.on('close', (code) => resolve(code === 0));
         proc.on('error', () => resolve(false));
     });
@@ -159,8 +160,11 @@ function validateWorkingDir(dir: string): string {
                 throw new Error(`Working directory is not a directory: ${dir}`);
             }
         } catch (error) {
-            if (error instanceof Error && error.message.includes('restricted path')) {
-                throw error;
+            if (error instanceof Error) {
+                // Preserve specific validation errors
+                if (error.message.includes('restricted path') || error.message.includes('not a directory')) {
+                    throw error;
+                }
             }
             throw new Error(`Working directory symlink is broken: ${dir}`);
         }
