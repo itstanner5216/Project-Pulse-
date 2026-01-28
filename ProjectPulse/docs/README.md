@@ -113,7 +113,7 @@ projectpulse delegation read <delegation-id>
 
 - **Timeout**: 900 seconds (15 minutes)
 - **Delegations Directory**: `~/.projectpulse/delegations`
-- **Max Concurrent Delegations**: Unlimited (daemon processes one at a time)
+- **Max Concurrent Delegations**: 1 (queue length unlimited)
 
 ## API Modules
 
