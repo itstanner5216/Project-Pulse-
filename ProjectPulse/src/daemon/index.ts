@@ -100,7 +100,10 @@ export async function isRunning(): Promise<boolean> {
 let watcher: DelegationWatcher | null = null;
 
 /**
- * Start the daemon.
+ * Start the delegation daemon if it is not already running.
+ *
+ * Creates and writes the daemon PID file, instantiates and starts a DelegationWatcher
+ * with logging callbacks, and registers signal handlers to perform a graceful shutdown.
  */
 export async function startDaemon(): Promise<void> {
     if (await isRunning()) {
