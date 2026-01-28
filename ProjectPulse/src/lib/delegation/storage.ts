@@ -71,7 +71,16 @@ export function getResultPath(id: string): string {
 // ============================================================================
 
 /**
- * Ensure the delegation directories exist.
+ * Ensure the delegation directories exist (pending, complete, logs).
+ * 
+ * Creates the required subdirectories within the delegations directory if they
+ * don't already exist. Safe to call multiple times; does not throw if directories
+ * already exist due to the { recursive: true } option.
+ * 
+ * This function is called during initialization before any operations that read
+ * or write delegation data, ensuring the directory structure is ready for use.
+ * 
+ * @returns A promise that resolves when all directories are created
  */
 export async function ensureDirs(): Promise<void> {
     const dirs = Object.values(DELEGATION_SUBDIRS).map((sub) =>
