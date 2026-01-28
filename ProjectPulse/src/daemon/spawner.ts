@@ -135,7 +135,11 @@ function validateWorkingDir(dir: string): string {
     
     for (const sensitiveDir of normalizedSensitiveDirs) {
         if (normalizedAbsPath === sensitiveDir || normalizedAbsPath.startsWith(sensitiveDir + path.sep)) {
-            throw new Error(`Working directory is in restricted path: ${dir}`);
+            throw new Error(
+                `Security error: Cannot execute in restricted system directory "${dir}". ` +
+                `This path is protected to prevent potential security risks. ` +
+                `Please use a different working directory for your project.`
+            );
         }
     }
     
@@ -145,7 +149,11 @@ function validateWorkingDir(dir: string): string {
         // Use lstat to check symlink itself, not target
         stats = fsSync.lstatSync(absPath);
     } catch {
-        throw new Error(`Working directory does not exist: ${dir}`);
+        throw new Error(
+            `Working directory does not exist: "${dir}". ` +
+            `Please ensure the directory exists before creating a delegation request. ` +
+            `You may need to create it with: mkdir -p "${absPath}"`
+        );
     }
     
     // For symlinks, also validate the real path
@@ -156,24 +164,39 @@ function validateWorkingDir(dir: string): string {
             // Check if real path is in sensitive directory
             for (const sensitiveDir of normalizedSensitiveDirs) {
                 if (normalizedRealPath === sensitiveDir || normalizedRealPath.startsWith(sensitiveDir + path.sep)) {
-                    throw new Error(`Working directory symlink points to restricted path: ${dir}`);
+                    throw new Error(
+                        `Security error: Symlink "${dir}" points to restricted system directory "${realPath}". ` +
+                        `This path is protected to prevent potential security risks. ` +
+                        `Please use a different working directory for your project.`
+                    );
                 }
             }
             // Check if real path is a directory
             const realStats = fsSync.statSync(realPath);
             if (!realStats.isDirectory()) {
-                throw new Error(`Working directory is not a directory: ${dir}`);
+                throw new Error(
+                    `Working directory "${dir}" is a symlink to a file, not a directory. ` +
+                    `The working directory must be a directory where code can be executed. ` +
+                    `Please use a directory path instead.`
+                );
             }
         } catch (error) {
-            if (error instanceof Error && error.message.includes('restricted path')) {
+            if (error instanceof Error && error.message.includes('Security error')) {
                 throw error;
             }
-            throw new Error(`Working directory symlink is broken: ${dir}`);
+            throw new Error(
+                `Symlink validation failed for "${dir}": The symlink appears to be broken or inaccessible. ` +
+                `Please check that the symlink target exists and is accessible.`
+            );
         }
     } else {
         // Verify it's a directory
         if (!stats.isDirectory()) {
-            throw new Error(`Working directory is not a directory: ${dir}`);
+            throw new Error(
+                `Path "${dir}" is not a directory. ` +
+                `The working directory must be a directory where code can be executed. ` +
+                `You provided a file path instead. Please use a directory path.`
+            );
         }
     }
     
@@ -192,7 +215,11 @@ async function loadAgentPrompt(agent: AgentType, workingDir: string): Promise<st
     // Validate agent type before attempting to load files
     if (!isValidAgentType(agent)) {
         const validTypes = Object.keys(AGENT_FILES).join(', ');
-        throw new Error(`Invalid agent type: "${agent}". Valid agent types are: ${validTypes}`);
+        throw new Error(
+            `Invalid agent type: "${agent}". ` +
+            `Valid agent types are: ${validTypes}. ` +
+            `Please check your delegation request and use one of the supported agent types.`
+        );
     }
     
     // Validate working directory before using it
@@ -238,7 +265,7 @@ export async function spawnAgent(
         const validTypes = Object.keys(AGENT_FILES).join(', ');
         return {
             stdout: '',
-            stderr: `Invalid agent type: "${request.agent}". Valid agent types are: ${validTypes}`,
+            stderr: `Invalid agent type: "${request.agent}". Valid agent types are: ${validTypes}. Please check your delegation request and use one of the supported agent types.`,
             exitCode: 1,
             timedOut: false,
         };
@@ -249,9 +276,10 @@ export async function spawnAgent(
     try {
         validWorkingDir = validateWorkingDir(request.workingDir);
     } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Invalid working directory';
         return {
             stdout: '',
-            stderr: error instanceof Error ? error.message : 'Invalid working directory',
+            stderr: `Failed to validate working directory: ${errMsg}`,
             exitCode: 1,
             timedOut: false,
         };
@@ -265,7 +293,7 @@ export async function spawnAgent(
         if (!detected) {
             return {
                 stdout: '',
-                stderr: 'No supported CLI found (tried: opencode, codex, gemini, claude)',
+                stderr: 'No supported AI CLI found. Tried: opencode, codex, gemini, claude. Please install one of these CLIs and ensure it is in your PATH. Visit the ProjectPulse documentation for installation instructions.',
                 exitCode: 1,
                 timedOut: false,
             };
@@ -276,7 +304,7 @@ export async function spawnAgent(
         if (!(await CLI_CONFIGS[cli].available())) {
             return {
                 stdout: '',
-                stderr: `CLI not available: ${cli}`,
+                stderr: `CLI not available: ${cli}. The requested CLI is not installed or not in your PATH. Please install ${cli} or use targetCli: 'auto' to automatically detect available CLIs.`,
                 exitCode: 1,
                 timedOut: false,
             };
@@ -288,9 +316,10 @@ export async function spawnAgent(
     try {
         agentContent = await loadAgentPrompt(request.agent, request.workingDir);
     } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Failed to load agent prompt';
         return {
             stdout: '',
-            stderr: error instanceof Error ? error.message : 'Failed to load agent prompt',
+            stderr: `Failed to load agent prompt: ${errMsg}`,
             exitCode: 1,
             timedOut: false,
         };

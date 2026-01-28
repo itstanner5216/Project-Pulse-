@@ -117,7 +117,7 @@ describe('spawner - workingDir validation', () => {
             const result = await spawnAgent(testRequest, 5000);
             
             expect(result.exitCode).toBe(1);
-            expect(result.stderr).toMatch(/Working directory is not a directory/);
+            expect(result.stderr).toMatch(/is not a directory/);
         });
 
         it('should reject empty string paths', async () => {
@@ -144,7 +144,7 @@ describe('spawner - workingDir validation', () => {
                 const result = await spawnAgent(testRequest, 5000);
                 
                 expect(result.exitCode).toBe(1);
-                expect(result.stderr).toMatch(/Working directory is in restricted path/);
+                expect(result.stderr).toMatch(/restricted.*directory|Security error/);
             });
 
             it(`should reject subdirectories of ${dir}`, async () => {
@@ -152,7 +152,7 @@ describe('spawner - workingDir validation', () => {
                 const result = await spawnAgent(testRequest, 5000);
                 
                 expect(result.exitCode).toBe(1);
-                expect(result.stderr).toMatch(/Working directory is in restricted path/);
+                expect(result.stderr).toMatch(/restricted.*directory|Security error/);
             });
         });
 

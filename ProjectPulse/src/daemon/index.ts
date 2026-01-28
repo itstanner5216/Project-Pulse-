@@ -14,6 +14,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { DelegationWatcher } from './watcher';
 import { getDelegationsDir } from '../lib/delegation/storage';
+import { initLogger, getLogger, Logger } from '../lib/logger';
 
 // ============================================================================
 // Constants
@@ -34,18 +35,17 @@ function getPidPath(): string {
     return path.join(getDelegationsDir(), PID_FILE);
 }
 
-async function log(message: string): Promise<void> {
-    const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] ${message}\n`;
-
-    try {
-        const logPath = getLogPath();
-        await fs.mkdir(path.dirname(logPath), { recursive: true });
-        await fs.appendFile(logPath, line);
-    } catch {
-        // Fall back to console
-        console.log(line.trim());
-    }
+/**
+ * Initialize the daemon logger with structured logging.
+ */
+function initDaemonLogger(): Logger {
+    return initLogger({
+        logPath: getLogPath(),
+        minLevel: process.env.LOG_LEVEL as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' || 'INFO',
+        format: process.env.LOG_FORMAT === 'json' ? 'json' : 'text',
+        maxSize: 10 * 1024 * 1024, // 10MB
+        maxFiles: 5,
+    });
 }
 
 // ============================================================================
@@ -131,26 +131,51 @@ export async function startDaemon(): Promise<void> {
         return;
     }
 
-    await log('Daemon starting...');
+    // Initialize structured logger
+    const logger = initDaemonLogger();
+    
+    logger.info('Daemon starting...', undefined, { pid: process.pid });
     await writePid();
 
     watcher = new DelegationWatcher({
         onPickup: (request) => {
-            void log(`Picked up: ${request.id} (agent: ${request.agent})`);
+            logger.info(
+                `Picked up delegation request for ${request.agent} agent`,
+                request.id,
+                { 
+                    agent: request.agent,
+                    prompt: request.prompt.substring(0, 100),
+                    workingDir: request.workingDir,
+                }
+            );
         },
         onComplete: (result) => {
-            void log(`Completed: ${result.id} (status: ${result.status}, duration: ${result.durationMs}ms)`);
+            logger.info(
+                `Delegation completed with status: ${result.status}`,
+                result.id,
+                { 
+                    status: result.status,
+                    durationMs: result.durationMs,
+                    exitCode: result.exitCode,
+                }
+            );
         },
         onError: (error, id) => {
-            void log(`Error${id ? ` (${id})` : ''}: ${error.message}`);
+            logger.error(
+                `Delegation processing failed: ${error.message}`,
+                id,
+                error,
+                { operation: 'delegation_processing' }
+            );
         },
     });
 
     // Handle shutdown signals
     const shutdown = async () => {
-        await log('Daemon shutting down...');
+        logger.info('Daemon received shutdown signal, stopping gracefully...');
         watcher?.stop();
         await removePid();
+        logger.info('Daemon shutdown complete');
         process.exit(0);
     };
 
@@ -159,7 +184,10 @@ export async function startDaemon(): Promise<void> {
     process.on('SIGHUP', () => void shutdown());
 
     await watcher.start();
-    await log('Daemon started, watching for delegations');
+    logger.info('Daemon started successfully, watching for delegations', undefined, {
+        logPath: getLogPath(),
+        pidPath: getPidPath(),
+    });
 
     console.log(`Delegation daemon started (PID: ${process.pid})`);
     console.log(`Log file: ${getLogPath()}`);
@@ -184,6 +212,7 @@ export async function stopDaemon(): Promise<boolean> {
         await new Promise((r) => setTimeout(r, 1000));
 
         if (await isRunning()) {
+            console.log('Daemon did not stop gracefully, sending SIGKILL');
             process.kill(pid, 'SIGKILL');
             console.log('Force killed daemon');
         }
@@ -191,7 +220,8 @@ export async function stopDaemon(): Promise<boolean> {
         await removePid();
         return true;
     } catch (error) {
-        console.log(`Failed to stop daemon: ${error}`);
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.log(`Failed to stop daemon (PID: ${pid}): ${err.message}`);
         await removePid();
         return false;
     }
