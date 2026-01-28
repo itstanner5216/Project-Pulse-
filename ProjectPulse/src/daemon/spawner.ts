@@ -292,7 +292,7 @@ export async function spawnAgent(
     // Load agent prompt
     let agentContent: string;
     try {
-        agentContent = await loadAgentPrompt(request.agent, request.workingDir);
+        agentContent = await loadAgentPrompt(request.agent, validWorkingDir);
     } catch (error) {
         return {
             stdout: '',
