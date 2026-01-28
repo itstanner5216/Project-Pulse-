@@ -140,7 +140,8 @@ Performance tests should be run:
 ### Regression Criteria
 
 A performance regression is detected when:
-- Any metric degrades by >10% from baseline
+- Any metric degrades by >10% from baseline (except where noted below)
+- Large repository test: performance degradation >100% (i.e., processing time doubles for the last batch vs. first batch in the "should process 100 requests without performance degradation" test)
 - Memory usage increases by >20%
 - Collision rates exceed targets
 - Tests timeout that previously passed

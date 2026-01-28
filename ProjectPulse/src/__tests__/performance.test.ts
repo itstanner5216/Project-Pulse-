@@ -17,13 +17,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { performance } from 'perf_hooks';
 import { generateId, generateUniqueId } from '../lib/delegation/id';
 import { DelegationWatcher } from '../daemon/watcher';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { createRequest, readRequest, deleteRequest, getSubdir } from '../lib/delegation/storage';
-import { DelegationRequest } from '../lib/delegation/types';
 import * as spawner from '../daemon/spawner';
 
 // ============================================================================
@@ -298,7 +298,6 @@ describe('Performance: File Watcher', () => {
             await createRequest({
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
-                cwd: tempDir,
                 timeout: 5000,
             });
 
@@ -327,7 +326,6 @@ describe('Performance: File Watcher', () => {
                 await createRequest({
                     agent: 'test-agent' as any,
                     workingDir: tempDir,
-                    cwd: tempDir,
                     timeout: 5000,
                 });
             });
@@ -352,7 +350,6 @@ describe('Performance: File Watcher', () => {
             await createRequest({
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
-                cwd: tempDir,
                 timeout: 5000,
             });
         }
@@ -483,7 +480,6 @@ describe('Performance: Large Repository Handling', () => {
                     createRequest({
                         agent: 'test-agent' as any,
                         workingDir: tempDir,
-                        cwd: tempDir,
                         timeout: 1000,
                     })
                 );
@@ -581,7 +577,6 @@ describe('Performance: Memory Overhead', () => {
             const request = await createRequest({
                 agent: 'test-agent' as any,
                 workingDir: tempDir,
-                cwd: tempDir,
                 timeout: 5000,
             });
             await deleteRequest(request.id);
@@ -653,14 +648,15 @@ describe('Performance: Request Processing', () => {
         
         for (let i = 0; i < iterations; i++) {
             const time = await measureTime(async () => {
-                const request = await createRequest({
+                const createResult = await createRequest({
                     agent: 'test-agent' as any,
                     workingDir: tempDir,
-                    cwd: tempDir,
                     timeout: 5000,
                 });
                 // Clean up
-                await deleteRequest(request.id);
+                if (createResult.ok) {
+                    await deleteRequest(createResult.data.id);
+                }
             });
             times.push(time);
         }
@@ -676,25 +672,27 @@ describe('Performance: Request Processing', () => {
 
     it('should read requests quickly', async () => {
         // Create a request first
-        const request = await createRequest({
+        const createResult = await createRequest({
             agent: 'test-agent' as any,
             workingDir: tempDir,
-            cwd: tempDir,
             timeout: 5000,
         });
+        
+        expect(createResult.ok).toBe(true);
+        const requestId = createResult.data!.id;
         
         const iterations = 1000;
         const times: number[] = [];
         
         for (let i = 0; i < iterations; i++) {
             const time = await measureTime(async () => {
-                await readRequest(request.id);
+                await readRequest(requestId);
             });
             times.push(time);
         }
         
         // Clean up
-        await deleteRequest(request.id);
+        await deleteRequest(requestId);
         
         const avgTime = times.reduce((sum, t) => sum + t, 0) / times.length;
         
