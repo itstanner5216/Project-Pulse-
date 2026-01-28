@@ -213,7 +213,7 @@ phases:
           including path validation, ID generation, and daemon lifecycle.
         source_refs:
           - "FOLLOWUP_TASKS.md#task-8-add-comprehensive-unit-tests"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Add tests for delegation ID generation (collision scenarios)"
           - "Add tests for daemon concurrent start attempts"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 12
+    todo: 11
     doing: 0
-    done: 2
+    done: 3
     blocked: 0
 
 # Workflow notes
