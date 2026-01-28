@@ -150,7 +150,7 @@ export async function startDaemon(): Promise<void> {
                 request.id,
                 { 
                     agent: request.agent,
-                    prompt: request.prompt.substring(0, 100),
+                    promptLength: request.prompt.length,
                     workingDir: request.workingDir,
                 }
             );
@@ -182,6 +182,9 @@ export async function startDaemon(): Promise<void> {
         watcher?.stop();
         await removePid();
         logger.info('Daemon shutdown complete');
+        
+        // Flush logs before exiting to ensure final messages are written
+        await logger.flush();
         process.exit(0);
     };
 

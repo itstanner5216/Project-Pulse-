@@ -256,6 +256,15 @@ export class Logger {
     getLogPath(): string {
         return this.options.logPath;
     }
+    
+    /**
+     * Flush all pending log writes.
+     * Waits for the write queue to complete.
+     * Should be called before process exit to ensure all logs are written.
+     */
+    async flush(): Promise<void> {
+        await this.writeQueue;
+    }
 }
 
 // ============================================================================

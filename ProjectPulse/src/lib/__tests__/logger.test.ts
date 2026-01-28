@@ -241,4 +241,43 @@ describe('Logger', () => {
             }
         });
     });
+
+    describe('Flush', () => {
+        it('should flush all pending writes', async () => {
+            const logger = new Logger({
+                logPath: testLogPath,
+                format: 'text',
+                minLevel: 'INFO',
+            });
+
+            // Write multiple logs quickly
+            logger.info('message 1');
+            logger.info('message 2');
+            logger.info('message 3');
+
+            // Flush and verify all are written
+            await logger.flush();
+
+            const content = await fs.readFile(testLogPath, 'utf-8');
+            expect(content).toContain('message 1');
+            expect(content).toContain('message 2');
+            expect(content).toContain('message 3');
+        });
+
+        it('should ensure logs are written before process exit', async () => {
+            const logger = new Logger({
+                logPath: testLogPath,
+                format: 'text',
+                minLevel: 'INFO',
+            });
+
+            logger.info('final message');
+            
+            // Simulate shutdown by flushing immediately
+            await logger.flush();
+
+            const content = await fs.readFile(testLogPath, 'utf-8');
+            expect(content).toContain('final message');
+        });
+    });
 });
