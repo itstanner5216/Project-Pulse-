@@ -187,7 +187,7 @@ phases:
         source_refs:
           - "CODE_REVIEW_FINDINGS.md#7-process-kill-check-can-give-false-negatives"
           - "FOLLOWUP_TASKS.md#task-7-improve-process-existence-check"
-        status: "todo"
+        status: "done"
         acceptance_criteria:
           - "Check error code in isRunning() catch block"
           - "Handle ESRCH: remove PID file, return false"
@@ -388,9 +388,9 @@ summary:
   phases: 9
   estimated_total_hours: 38
   status_counts:
-    todo: 12
+    todo: 11
     doing: 0
-    done: 2
+    done: 3
     blocked: 0
 
 # Workflow notes
