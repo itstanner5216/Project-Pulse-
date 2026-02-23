@@ -189,7 +189,8 @@ function validateWorkingDir(dir: string): string {
             }
             throw new Error(
                 `Symlink validation failed for "${dir}": The symlink appears to be broken or inaccessible. ` +
-                `Please check that the symlink target exists and is accessible.`
+                `Please check that the symlink target exists and is accessible.`,
+                { cause: error }
             );
         }
     } else {
