@@ -22,7 +22,7 @@ import {
     err,
     DelegationEnvelope,
 } from './types';
-import { generateId } from './id';
+import { generateUniqueId } from './id';
 
 // ============================================================================
 // Path Helpers
@@ -105,7 +105,7 @@ export async function createRequest(
     try {
         await ensureDirs();
 
-        const id = generateId();
+        const id = generateUniqueId();
         const fullRequest: DelegationRequest = {
             ...request,
             id,
