@@ -58,10 +58,22 @@ function initDaemonLogger(): Logger {
 // PID Management
 // ============================================================================
 
-async function writePid(): Promise<void> {
+async function writePid(): Promise<boolean> {
     const pidPath = getPidPath();
     await fs.mkdir(path.dirname(pidPath), { recursive: true });
-    await fs.writeFile(pidPath, String(process.pid));
+    try {
+        // Use exclusive create ('wx') flag for atomic PID file creation.
+        // If the file already exists this throws EEXIST, preventing the race
+        // condition where two processes both pass isRunning() before either
+        // writes the PID file.
+        await fs.writeFile(pidPath, String(process.pid), { flag: 'wx' });
+        return true;
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+            return false;
+        }
+        throw error;
+    }
 }
 
 async function readPid(): Promise<number | null> {
@@ -141,7 +153,13 @@ export async function startDaemon(): Promise<void> {
     const logger = initDaemonLogger();
     
     logger.info('Daemon starting...', undefined, { pid: process.pid });
-    await writePid();
+
+    // Atomically acquire PID lock to prevent race condition where two processes
+    // both pass the isRunning() check before either writes the PID file.
+    if (!await writePid()) {
+        logger.info('Daemon is already running (race condition prevented)');
+        return;
+    }
 
     watcher = new DelegationWatcher({
         onPickup: (request) => {

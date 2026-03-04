@@ -55,7 +55,7 @@ The following security issues have been identified and are documented in our cod
 ### Critical
 
 1. **Path Validation in Subprocess Spawning**
-   - **Status:** 🔴 Open
+   - **Status:** ✅ Fixed
    - **Issue:** `workingDir` parameter not validated before use
    - **Impact:** Potential arbitrary code execution
    - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#1-missing-validation-of-workingdir-path)
@@ -64,14 +64,14 @@ The following security issues have been identified and are documented in our cod
 ### High
 
 2. **ID Collision in Delegation Requests**
-   - **Status:** 🟡 Open
+   - **Status:** ✅ Fixed
    - **Issue:** Delegation IDs can collide, causing silent data corruption
    - **Impact:** Data integrity issues
    - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#2-id-collision-vulnerability-in-request-creation)
    - **Fix Priority:** High
 
 3. **Daemon Race Condition**
-   - **Status:** 🟡 Open
+   - **Status:** ✅ Fixed
    - **Issue:** Multiple daemon instances can start simultaneously
    - **Impact:** Resource conflicts and unpredictable behavior
    - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#3-race-condition-in-daemon-start)
@@ -228,9 +228,9 @@ npm audit --json
 ## Security Roadmap
 
 ### Version 0.1.1 (In Progress)
-- [ ] Fix critical path validation issue
-- [ ] Add ID collision prevention
-- [ ] Fix daemon race condition
+- [x] Fix critical path validation issue
+- [x] Add ID collision prevention
+- [x] Fix daemon race condition
 - [ ] Add security tests
 
 ### Version 0.2.0 (Planned)
