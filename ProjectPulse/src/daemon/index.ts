@@ -161,63 +161,71 @@ export async function startDaemon(): Promise<void> {
         return;
     }
 
-    watcher = new DelegationWatcher({
-        onPickup: (request) => {
-            logger.info(
-                `Picked up delegation request for ${request.agent} agent`,
-                request.id,
-                { 
-                    agent: request.agent,
-                    promptLength: request.prompt.length,
-                    workingDir: request.workingDir,
-                }
-            );
-        },
-        onComplete: (result) => {
-            logger.info(
-                `Delegation completed with status: ${result.status}`,
-                result.id,
-                { 
-                    status: result.status,
-                    durationMs: result.durationMs,
-                    exitCode: result.exitCode,
-                }
-            );
-        },
-        onError: (error, id) => {
-            logger.error(
-                `Delegation processing failed: ${error.message}`,
-                id,
-                { operation: 'delegation_processing' },
-                error
-            );
-        },
-    });
+    try {
+        watcher = new DelegationWatcher({
+            onPickup: (request) => {
+                logger.info(
+                    `Picked up delegation request for ${request.agent} agent`,
+                    request.id,
+                    { 
+                        agent: request.agent,
+                        promptLength: request.prompt.length,
+                        workingDir: request.workingDir,
+                    }
+                );
+            },
+            onComplete: (result) => {
+                logger.info(
+                    `Delegation completed with status: ${result.status}`,
+                    result.id,
+                    { 
+                        status: result.status,
+                        durationMs: result.durationMs,
+                        exitCode: result.exitCode,
+                    }
+                );
+            },
+            onError: (error, id) => {
+                logger.error(
+                    `Delegation processing failed: ${error.message}`,
+                    id,
+                    { operation: 'delegation_processing' },
+                    error
+                );
+            },
+        });
 
-    // Handle shutdown signals
-    const shutdown = async () => {
-        logger.info('Daemon received shutdown signal, stopping gracefully...');
-        watcher?.stop();
+        // Handle shutdown signals
+        const shutdown = async () => {
+            logger.info('Daemon received shutdown signal, stopping gracefully...');
+            watcher?.stop();
+            await removePid();
+            logger.info('Daemon shutdown complete');
+            
+            // Flush logs before exiting to ensure final messages are written
+            await logger.flush();
+            process.exit(0);
+        };
+
+        process.on('SIGTERM', () => void shutdown());
+        process.on('SIGINT', () => void shutdown());
+        process.on('SIGHUP', () => void shutdown());
+
+        await watcher.start();
+        logger.info('Daemon started successfully, watching for delegations', undefined, {
+            logPath: getLogPath(),
+            pidPath: getPidPath(),
+        });
+
+        console.log(`Delegation daemon started (PID: ${process.pid})`);
+        console.log(`Log file: ${getLogPath()}`);
+    } catch (error) {
+        // Startup failed after PID lock was acquired — clean up to avoid stale lock
+        logger.error('Daemon startup failed, removing PID lock', undefined, undefined, 
+            error instanceof Error ? error : new Error(String(error)));
         await removePid();
-        logger.info('Daemon shutdown complete');
-        
-        // Flush logs before exiting to ensure final messages are written
-        await logger.flush();
-        process.exit(0);
-    };
-
-    process.on('SIGTERM', () => void shutdown());
-    process.on('SIGINT', () => void shutdown());
-    process.on('SIGHUP', () => void shutdown());
-
-    await watcher.start();
-    logger.info('Daemon started successfully, watching for delegations', undefined, {
-        logPath: getLogPath(),
-        pidPath: getPidPath(),
-    });
-
-    console.log(`Delegation daemon started (PID: ${process.pid})`);
-    console.log(`Log file: ${getLogPath()}`);
+        throw error;
+    }
 }
 
 /**

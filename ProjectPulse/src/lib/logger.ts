@@ -27,6 +27,10 @@ export interface LogEntry {
     error?: {
         message: string;
         stack?: string;
+        cause?: {
+            message: string;
+            stack?: string;
+        };
     };
 }
 
@@ -96,6 +100,10 @@ export class Logger {
         const errorInfo = error ? {
             message: error.message,
             stack: error.stack,
+            cause: error.cause instanceof Error ? {
+                message: error.cause.message,
+                stack: error.cause.stack,
+            } : undefined,
         } : undefined;
         
         void this.log('ERROR', message, delegationId, context, errorInfo);
@@ -109,7 +117,7 @@ export class Logger {
         message: string,
         delegationId?: string,
         context?: Record<string, unknown>,
-        error?: { message: string; stack?: string }
+        error?: { message: string; stack?: string; cause?: { message: string; stack?: string } }
     ): Promise<void> {
         // Check log level threshold
         if (LOG_LEVELS[level] < LOG_LEVELS[this.options.minLevel]) {
@@ -181,6 +189,12 @@ export class Logger {
             formatted += ` | Error: ${entry.error.message}`;
             if (entry.error.stack) {
                 formatted += `\n${entry.error.stack}`;
+            }
+            if (entry.error.cause) {
+                formatted += `\n  Caused by: ${entry.error.cause.message}`;
+                if (entry.error.cause.stack) {
+                    formatted += `\n${entry.error.cause.stack}`;
+                }
             }
         }
         
