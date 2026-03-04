@@ -49,6 +49,32 @@ function getMemoryUsageMB(): number {
 }
 
 /**
+ * Compute a statistically justified upper bound for the mean collision rate
+ * of `trials` independent runs of `draws` samples from `combinations` slots.
+ *
+ * Uses the occupancy-problem expected rate and its standard deviation, then
+ * applies a 99.9th-percentile z-score (z = 3.09) to the sampling distribution
+ * of the mean, giving a threshold that fails randomly with probability < 0.001.
+ *
+ * @param combinations - Total number of distinct IDs (N)
+ * @param draws - Number of IDs generated per trial (n)
+ * @param trials - Number of independent trials whose mean is compared (T)
+ * @returns Upper-bound collision rate percentage (0–100)
+ */
+function computeCollisionBound(combinations: number, draws: number, trials: number): number {
+    // Expected number of unique IDs per trial (occupancy problem)
+    const expectedUnique = combinations * (1 - Math.pow((combinations - 1) / combinations, draws));
+    const expectedRate = ((draws - expectedUnique) / draws) * 100;
+    // Std dev of collision count per trial via occupancy-problem approximation:
+    // Var(unique) ≈ combinations * p * (1 - p), where p = expectedUnique / combinations
+    const p = expectedUnique / combinations;
+    const stdRate = (Math.sqrt(combinations * p * (1 - p)) / draws) * 100;
+    // 99.9th-percentile z-score; mean of T trials has std = stdRate / sqrt(T)
+    const z999 = 3.09;
+    return expectedRate + z999 * (stdRate / Math.sqrt(trials));
+}
+
+/**
  * Create a temporary directory for tests
  */
 async function createTempDir(): Promise<string> {
@@ -95,22 +121,30 @@ describe('Performance: ID Generation', () => {
 
         it('should have <5% collision rate with 10,000 iterations', () => {
             const iterations = 10000;
-            const ids = new Set<string>();
-            
-            for (let i = 0; i < iterations; i++) {
-                ids.add(generateId());
+            // 40 adjectives × 48 colors × 56 animals
+            const COMBINATIONS = 40 * 48 * 56;
+            const TRIALS = 5;
+
+            let totalCollisionRate = 0;
+            for (let t = 0; t < TRIALS; t++) {
+                const ids = new Set<string>();
+                for (let i = 0; i < iterations; i++) {
+                    ids.add(generateId());
+                }
+                const collisions = iterations - ids.size;
+                totalCollisionRate += (collisions / iterations) * 100;
             }
-            
-            const uniqueCount = ids.size;
-            const collisions = iterations - uniqueCount;
-            const collisionRate = (collisions / iterations) * 100;
-            
-            // Should have less than 10% collision rate
-            expect(collisionRate).toBeLessThan(10);
-            
+            const meanCollisionRate = totalCollisionRate / TRIALS;
+
+            // Statistically justified upper bound: 99.9th-percentile of the
+            // sampling distribution of the mean collision rate over TRIALS trials
+            const computedThreshold = computeCollisionBound(COMBINATIONS, iterations, TRIALS);
+
+            expect(meanCollisionRate).toBeLessThan(computedThreshold);
+
             // Log metrics
-            console.log(`  ✓ Generated ${iterations.toLocaleString()} IDs with ${uniqueCount.toLocaleString()} unique`);
-            console.log(`  ✓ Collision rate: ${collisionRate.toFixed(2)}%`);
+            console.log(`  ✓ Mean collision rate over ${TRIALS} trials: ${meanCollisionRate.toFixed(2)}%`);
+            console.log(`  ✓ Statistical threshold (99.9th pct): ${computedThreshold.toFixed(2)}%`);
         });
 
         it('should have <1% collision rate with 1,000 iterations', () => {
