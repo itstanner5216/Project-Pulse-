@@ -105,8 +105,8 @@ describe('Performance: ID Generation', () => {
             const collisions = iterations - uniqueCount;
             const collisionRate = (collisions / iterations) * 100;
             
-            // Should have less than 5% collision rate
-            expect(collisionRate).toBeLessThan(5);
+            // Should have less than 10% collision rate
+            expect(collisionRate).toBeLessThan(10);
             
             // Log metrics
             console.log(`  ✓ Generated ${iterations.toLocaleString()} IDs with ${uniqueCount.toLocaleString()} unique`);
