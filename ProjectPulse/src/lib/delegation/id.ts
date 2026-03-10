@@ -37,6 +37,16 @@ const ANIMALS = [
 ];
 
 // ============================================================================
+// ID Space Size
+// ============================================================================
+
+/**
+ * Total number of distinct IDs that {@link generateId} can produce.
+ * Derived directly from the word lists, so it stays in sync automatically.
+ */
+export const ID_SPACE_SIZE = ADJECTIVES.length * COLORS.length * ANIMALS.length;
+
+// ============================================================================
 // ID Generator
 // ============================================================================
 

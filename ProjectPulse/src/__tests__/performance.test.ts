@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { performance } from 'perf_hooks';
-import { generateId, generateUniqueId } from '../lib/delegation/id';
+import { generateId, generateUniqueId, ID_SPACE_SIZE } from '../lib/delegation/id';
 import { DelegationWatcher } from '../daemon/watcher';
 import { promises as fs } from 'fs';
 import * as path from 'path';
@@ -65,10 +65,13 @@ function computeCollisionBound(combinations: number, draws: number, trials: numb
     // Expected number of unique IDs per trial (occupancy problem)
     const expectedUnique = combinations * (1 - Math.pow((combinations - 1) / combinations, draws));
     const expectedRate = ((draws - expectedUnique) / draws) * 100;
-    // Std dev of collision count per trial via occupancy-problem approximation:
-    // Var(unique) ≈ combinations * p * (1 - p), where p = expectedUnique / combinations
-    const p = expectedUnique / combinations;
-    const stdRate = (Math.sqrt(combinations * p * (1 - p)) / draws) * 100;
+    // Exact variance of the number of occupied boxes U (birthday/occupancy problem):
+    //   a = (1 - 1/N)^n,  b = (1 - 2/N)^n
+    //   Var(U) = N*a*(1-a) + N*(N-1)*(b - a²)
+    const a = Math.pow(1 - 1 / combinations, draws);
+    const b = Math.pow(1 - 2 / combinations, draws);
+    const varU = combinations * a * (1 - a) + combinations * (combinations - 1) * (b - a * a);
+    const stdRate = (Math.sqrt(varU) / draws) * 100;
     // 99.9th-percentile z-score; mean of T trials has std = stdRate / sqrt(T)
     const z999 = 3.09;
     return expectedRate + z999 * (stdRate / Math.sqrt(trials));
@@ -121,8 +124,7 @@ describe('Performance: ID Generation', () => {
 
         it('should have collision rate below the computed 99.9th-percentile bound for 10,000 iterations', () => {
             const iterations = 10000;
-            // 40 adjectives × 48 colors × 56 animals
-            const COMBINATIONS = 40 * 48 * 56;
+            const COMBINATIONS = ID_SPACE_SIZE; // derived from actual word lists in id.ts
             const TRIALS = 5;
 
             let totalCollisionRate = 0;
