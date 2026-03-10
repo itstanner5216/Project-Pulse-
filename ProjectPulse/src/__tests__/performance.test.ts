@@ -119,7 +119,7 @@ describe('Performance: ID Generation', () => {
             console.log(`  ✓ Performance: ${idsPerSecond.toLocaleString()} IDs/second`);
         });
 
-        it('should have <5% collision rate with 10,000 iterations', () => {
+        it('should have collision rate below the computed 99.9th-percentile bound for 10,000 iterations', () => {
             const iterations = 10000;
             // 40 adjectives × 48 colors × 56 animals
             const COMBINATIONS = 40 * 48 * 56;
