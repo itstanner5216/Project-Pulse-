@@ -220,7 +220,6 @@ To maintain performance over time:
 
 ## References
 
-- [FOLLOWUP_TASKS.md#task-13-add-performance-tests](../FOLLOWUP_TASKS.md)
 - [Vitest Documentation](https://vitest.dev/)
 - [Node.js Performance Timing](https://nodejs.org/api/perf_hooks.html)
 - [V8 Performance Optimization](https://v8.dev/docs/turbofan)
