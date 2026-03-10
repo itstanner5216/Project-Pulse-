@@ -60,15 +60,41 @@ async function createTempDir(): Promise<string> {
  * Compute 99.9th-percentile upper bound for collision rate using occupancy math.
  * Uses z-score of 3.09 (99.9th percentile) for a statistically justified bound.
  *
- * For n draws from a space of N values, the expected number of collisions is
- * approximated as n * (1 - exp(-n/N)) using the occupancy-problem formula.
- * The bound adds a z*sigma margin for the 99.9th percentile.
+ * Model: throw n balls uniformly at random into N buckets (ID space size).
+ * Let O be the number of occupied buckets. Then:
+ *   - P(a specific bucket is empty)   = (1 - 1/N)^n
+ *   - P(a specific bucket is occupied)= 1 - (1 - 1/N)^n
+ *   - P(two specific buckets both occupied)
+ *       = 1 - 2*(1 - 1/N)^n + (1 - 2/N)^n
+ *   - E[O]  = N * P(occupied)
+ *   - Var(O)= N * p*(1 - p) + N*(N - 1)*(p11 - p^2)
+ *
+ * Collisions C are given by C = n - O, so Var(C) = Var(O).
+ * The collision rate is C/n, whose variance is Var(O) / n^2.
+ * We return E[C]/n + z * sqrt(Var(C/n)) as an upper bound.
  */
 function computeCollisionBound(n: number, N: number, z = 3.09): number {
-    const expectedCollisions = n * (1 - Math.exp(-n / N));
+    if (n <= 0 || N <= 0) {
+        return 0;
+    }
+
+    // Occupancy probabilities
+    const p0 = Math.pow(1 - 1 / N, n);         // bucket empty
+    const p1 = 1 - p0;                         // bucket occupied
+    const p00 = Math.pow(1 - 2 / N, n);        // two specific buckets both empty
+    const p11 = 1 - 2 * p0 + p00;              // two specific buckets both occupied
+
+    // Expected number of occupied buckets and its variance
+    const expectedOccupied = N * p1;
+    const varOccupied =
+        N * p1 * (1 - p1) +                    // sum Var(I_i)
+        N * (N - 1) * (p11 - p1 * p1);         // sum_{i≠j} Cov(I_i, I_j)
+
+    // Convert to expected collisions and collision-rate variance
+    const expectedCollisions = n - expectedOccupied;
     const expectedRate = expectedCollisions / n;
-    const variance = expectedRate * (1 - expectedRate) / n;
-    const sigma = Math.sqrt(variance);
+    const varianceRate = Math.max(varOccupied, 0) / (n * n);
+    const sigma = Math.sqrt(varianceRate);
     return expectedRate + z * sigma;
 }
 
