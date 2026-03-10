@@ -57,7 +57,7 @@ export class DelegationWatcher {
         // Ensure directory exists
         await fs.mkdir(this.pendingDir, { recursive: true });
 
-        // Try native watch first
+        // Try native watch for immediate detection
         try {
             this.watcher = watch(this.pendingDir, (eventType, filename) => {
                 if (eventType === 'rename' && filename?.endsWith('.json')) {
@@ -81,18 +81,23 @@ export class DelegationWatcher {
                 
                 if (!this.running) return;
 
-                // Fall back to polling on watch error
+                // Polling is already running as a fallback, but ensure it's started
+                // in case it was somehow stopped
                 this.startPolling();
                 
                 // Call error callback last, so cleanup happens even if it throws
                 this.options.onError(err);
             });
         } catch {
-            // Fall back to polling if watch fails
-            this.startPolling();
+            // Native watch unavailable, will rely on polling below
         }
 
-        // Also poll initially to catch any existing requests
+        // Always start polling as a reliable fallback alongside native watch.
+        // fs.watch can be unreliable in some environments (CI, containers, certain
+        // filesystems). The processing set prevents duplicate request handling.
+        this.startPolling();
+
+        // Also poll immediately to catch any existing requests
         await this.pollOnce();
     }
 
