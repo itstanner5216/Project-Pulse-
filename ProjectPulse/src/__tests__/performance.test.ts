@@ -9,7 +9,7 @@
  * 
  * Performance Targets:
  * - ID generation: >10,000 IDs/second
- * - ID collision rate (generateId): <5% with 10K iterations
+ * - ID collision rate (generateId): below computed 99.9th-percentile occupancy bound with 10K iterations
  * - ID collision rate (generateUniqueId): <0.01% with 100K iterations
  * - File watcher pickup time: <100ms for new requests
  * - Memory overhead: <5MB for various operations
@@ -135,7 +135,7 @@ describe('Performance: ID Generation', () => {
             console.log(`  ✓ Performance: ${idsPerSecond.toLocaleString()} IDs/second`);
         });
 
-        it('should have <5% collision rate with 10,000 iterations', () => {
+        it('should have collision rate below the computed 99.9th-percentile bound for 10,000 iterations', () => {
             const iterations = 10000;
             const TRIALS = 5;
             let totalCollisionRate = 0;
