@@ -50,7 +50,7 @@ Send an email to the project maintainers with:
 
 ## Known Security Issues
 
-The following security issues have been identified and are documented in our code review:
+The following security issues have been identified and are tracked in the project:
 
 ### Critical
 
@@ -58,7 +58,6 @@ The following security issues have been identified and are documented in our cod
    - **Status:** 🔴 Open
    - **Issue:** `workingDir` parameter not validated before use
    - **Impact:** Potential arbitrary code execution
-   - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#1-missing-validation-of-workingdir-path)
    - **Fix Priority:** Immediate
 
 ### High
@@ -67,17 +66,13 @@ The following security issues have been identified and are documented in our cod
    - **Status:** 🟡 Open
    - **Issue:** Delegation IDs can collide, causing silent data corruption
    - **Impact:** Data integrity issues
-   - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#2-id-collision-vulnerability-in-request-creation)
    - **Fix Priority:** High
 
 3. **Daemon Race Condition**
    - **Status:** 🟡 Open
    - **Issue:** Multiple daemon instances can start simultaneously
    - **Impact:** Resource conflicts and unpredictable behavior
-   - **Tracked in:** [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md#3-race-condition-in-daemon-start)
    - **Fix Priority:** High
-
-See [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md) for complete details and recommended fixes.
 
 ## Security Best Practices
 

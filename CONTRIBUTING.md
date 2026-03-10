@@ -20,7 +20,7 @@ We are committed to providing a welcoming and inclusive environment for all cont
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
+- Node.js >= 18.18.0
 - npm or yarn
 - Git
 - Basic understanding of TypeScript and Bash
@@ -506,8 +506,6 @@ npm test -- src/lib/delegation/id.test.ts
 
 - **Documentation:**
   - [README.md](./README.md) - Project overview
-  - [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md) - Security review
-  - [FOLLOWUP_TASKS.md](./FOLLOWUP_TASKS.md) - Planned improvements
 
 - **External Resources:**
   - [TypeScript Documentation](https://www.typescriptlang.org/docs/)

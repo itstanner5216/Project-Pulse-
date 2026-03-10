@@ -136,9 +136,7 @@ npm run type-check
 
 <!-- Link to the source documents that informed these tasks -->
 
-- Reviewed: `CODE_REVIEW_FINDINGS.md`
-- Reviewed: `FOLLOWUP_TASKS.md`
-- Reviewed: `REVIEW_SUMMARY.md`
+- Reviewed: `SECURITY.md`
 - Task Details: `agentprompts/QUEUE.yml`
 
 ---

@@ -298,15 +298,15 @@ process.on('SIGTERM', async () => {
 - ✅ Human-readable and memorable
 - ✅ Easy to type and communicate
 - ✅ Sortable (alphabetically)
-- ✅ Collision-resistant (13,824 combinations)
+- ✅ Collision-resistant (107,520 combinations)
 
 **Implementation**:
 ```typescript
-const ADJECTIVES = ['swift', 'clever', 'brave', ...]; // 24 options
-const COLORS = ['amber', 'blue', 'crimson', ...];     // 24 options
-const ANIMALS = ['falcon', 'tiger', 'dragon', ...];   // 24 options
+const ADJECTIVES = ['swift', 'clever', 'brave', ...]; // 40 options
+const COLORS = ['amber', 'blue', 'crimson', ...];     // 48 options
+const ANIMALS = ['falcon', 'tiger', 'dragon', ...];   // 56 options
 
-// Total combinations: 24 * 24 * 24 = 13,824
+// Total combinations: 40 * 48 * 56 = 107,520
 ```
 
 ---

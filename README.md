@@ -1,7 +1,7 @@
 # Project Pulse
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Node Version](https://img.shields.io/badge/node-%3E%3D18.18.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 
 > **IDE-like project awareness for AI agents and developers**
@@ -28,7 +28,7 @@ Project Pulse solves the fundamental problem of **giving AI agents rich codebase
 
 ### Prerequisites
 
-- **Node.js** >= 18.0.0
+- **Node.js** >= 18.18.0
 - **npm** or **yarn**
 - **Git** (for cloning the repository)
 
@@ -242,15 +242,6 @@ Project-Pulse-/
 
 ## 🔒 Security
 
-**⚠️ Security Review Findings:**
-
-A comprehensive security review has been performed. See [CODE_REVIEW_FINDINGS.md](./CODE_REVIEW_FINDINGS.md) for details on:
-
-- **Critical Issues:** Path validation in subprocess spawning
-- **High Issues:** ID collision handling, daemon race conditions
-- **Medium Issues:** Resource management and cleanup
-- **Recommendations:** Input validation, error handling improvements
-
 **Security Best Practices:**
 - Always validate and sanitize file paths
 - Use atomic operations for concurrent access
@@ -281,7 +272,7 @@ All pull requests undergo:
 ### Current Focus (v0.1.x)
 - ✅ Core CLI and delegation system
 - ✅ Multi-agent support
-- ⏳ Security hardening (see CODE_REVIEW_FINDINGS.md)
+- ⏳ Security hardening
 - ⏳ Expanded test coverage
 
 ### Upcoming Features (v0.2.x)
@@ -298,8 +289,6 @@ All pull requests undergo:
 
 ## 📝 Documentation
 
-- **[Code Review Findings](./CODE_REVIEW_FINDINGS.md)** - Detailed security and code quality review
-- **[Follow-up Tasks](./FOLLOWUP_TASKS.md)** - Prioritized list of improvements
 - **[Conductor Guidelines](./conductor/)** - Project management and development guidelines
 - **[Agent Prompts](./agentprompts/)** - AI agent templates and documentation
 
