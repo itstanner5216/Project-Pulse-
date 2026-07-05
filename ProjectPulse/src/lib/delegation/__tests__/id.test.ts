@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { generateId, isValidId, generateUniqueId } from '../id';
+import { generateId, isValidId, generateUniqueId, ID_SPACE_SIZE } from '../id';
 
 describe('generateId', () => {
     it('should generate IDs in the correct format', () => {
@@ -269,6 +269,50 @@ describe('ID collision scenarios', () => {
         
         // generateId will likely have some collisions
         // (though we're not asserting a specific number as it's probabilistic)
+    });
+});
+
+describe('ID_SPACE_SIZE', () => {
+    it('should be a positive integer', () => {
+        expect(Number.isInteger(ID_SPACE_SIZE)).toBe(true);
+        expect(ID_SPACE_SIZE).toBeGreaterThan(0);
+    });
+
+    it('should equal the product of the adjective, color, and animal word list sizes', () => {
+        // Pinned to the current word lists (40 adjectives x 48 colors x 56 animals).
+        // This is a regression guard: if this fails, either a word list changed
+        // size or ID_SPACE_SIZE is no longer derived correctly from the lists.
+        expect(ID_SPACE_SIZE).toBe(40 * 48 * 56);
+        expect(ID_SPACE_SIZE).toBe(107520);
+    });
+
+    it('should match the approximate combination count documented on generateId', () => {
+        // generateId()'s doc comment states "~40 x ~48 x ~56 = ~107,520 combinations"
+        expect(ID_SPACE_SIZE).toBeCloseTo(107520, 0);
+    });
+
+    it('should remain a stable constant across repeated reads', () => {
+        const first = ID_SPACE_SIZE;
+        const second = ID_SPACE_SIZE;
+        expect(first).toBe(second);
+    });
+
+    it('should imply a low expected collision count for typical batch sizes', () => {
+        // Birthday-paradox approximation: expected number of colliding pairs
+        // for `draws` samples from ID_SPACE_SIZE slots.
+        const draws = 1000;
+        const expectedCollisions = (draws * (draws - 1)) / (2 * ID_SPACE_SIZE);
+        expect(expectedCollisions).toBeLessThan(draws * 0.05);
+    });
+
+    it('should be consistent with the empirically observed generateId() output space', () => {
+        // Every generated ID must be composed of exactly 3 valid words, so the
+        // number of distinct IDs actually producible cannot exceed ID_SPACE_SIZE.
+        const seen = new Set<string>();
+        for (let i = 0; i < 5000; i++) {
+            seen.add(generateId());
+        }
+        expect(seen.size).toBeLessThanOrEqual(ID_SPACE_SIZE);
     });
 });
 

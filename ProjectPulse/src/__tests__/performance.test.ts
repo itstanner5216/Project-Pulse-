@@ -9,7 +9,7 @@
  * 
  * Performance Targets:
  * - ID generation: >10,000 IDs/second
- * - ID collision rate (generateId): below computed 99.9th-percentile occupancy bound with 10K iterations
+ * - ID collision rate (generateId): <5% with 10K iterations
  * - ID collision rate (generateUniqueId): <0.01% with 100K iterations
  * - File watcher pickup time: <100ms for new requests
  * - Memory overhead: <5MB for various operations
@@ -49,53 +49,127 @@ function getMemoryUsageMB(): number {
 }
 
 /**
+ * Compute a statistically justified upper bound for the mean collision rate
+ * of `trials` independent runs of `draws` samples from `combinations` slots.
+ *
+ * Uses the occupancy-problem expected rate and its standard deviation, then
+ * applies a 99.9th-percentile z-score (z = 3.09) to the sampling distribution
+ * of the mean, giving a threshold that fails randomly with probability < 0.001.
+ *
+ * @param combinations - Total number of distinct IDs (N)
+ * @param draws - Number of IDs generated per trial (n)
+ * @param trials - Number of independent trials whose mean is compared (T)
+ * @returns Upper-bound collision rate percentage (0–100)
+ */
+function computeCollisionBound(combinations: number, draws: number, trials: number): number {
+    // Expected number of unique IDs per trial (occupancy problem)
+    const expectedUnique = combinations * (1 - Math.pow((combinations - 1) / combinations, draws));
+    const expectedRate = ((draws - expectedUnique) / draws) * 100;
+    // Exact variance of the number of occupied boxes U (birthday/occupancy problem):
+    //   a = (1 - 1/N)^n,  b = (1 - 2/N)^n
+    //   Var(U) = N*a*(1-a) + N*(N-1)*(b - a²)
+    const a = Math.pow(1 - 1 / combinations, draws);
+    const b = Math.pow(1 - 2 / combinations, draws);
+    const varU = combinations * a * (1 - a) + combinations * (combinations - 1) * (b - a * a);
+    const stdRate = (Math.sqrt(varU) / draws) * 100;
+    // 99.9th-percentile z-score; mean of T trials has std = stdRate / sqrt(T)
+    const z999 = 3.09;
+    return expectedRate + z999 * (stdRate / Math.sqrt(trials));
+}
+
+// ============================================================================
+// computeCollisionBound Helper Tests
+// ============================================================================
+
+describe('computeCollisionBound (statistical helper)', () => {
+    it('should return a value greater than or equal to the raw expected collision rate', () => {
+        const combinations = 1000;
+        const draws = 100;
+        const a = Math.pow(1 - 1 / combinations, draws);
+        const expectedUnique = combinations * (1 - a);
+        const expectedRate = ((draws - expectedUnique) / draws) * 100;
+
+        const bound = computeCollisionBound(combinations, draws, 10);
+
+        // The bound adds a non-negative z-score margin on top of the raw
+        // expected rate, so it must never be smaller than the raw rate.
+        expect(bound).toBeGreaterThanOrEqual(expectedRate);
+    });
+
+    it('should tighten (decrease) as the number of trials increases', () => {
+        const combinations = 5000;
+        const draws = 200;
+
+        const boundFewTrials = computeCollisionBound(combinations, draws, 1);
+        const boundManyTrials = computeCollisionBound(combinations, draws, 100);
+
+        expect(boundManyTrials).toBeLessThan(boundFewTrials);
+    });
+
+    it('should approach the raw expected collision rate as trials grows very large', () => {
+        const combinations = 5000;
+        const draws = 200;
+        const a = Math.pow(1 - 1 / combinations, draws);
+        const expectedUnique = combinations * (1 - a);
+        const expectedRate = ((draws - expectedUnique) / draws) * 100;
+
+        const boundHugeTrials = computeCollisionBound(combinations, draws, 1_000_000);
+
+        // With enormous trial counts, the z-score margin shrinks toward zero.
+        expect(boundHugeTrials).toBeCloseTo(expectedRate, 1);
+    });
+
+    it('should predict a near-zero collision rate when combinations vastly exceed draws', () => {
+        const bound = computeCollisionBound(1_000_000, 100, 5);
+
+        expect(bound).toBeGreaterThanOrEqual(0);
+        expect(bound).toBeLessThan(1);
+    });
+
+    it('should predict a substantial collision rate when draws saturate the combination space', () => {
+        // Classic occupancy problem: drawing N times from N slots leaves
+        // roughly 1/e of slots empty, so the expected collision rate is
+        // well above what would be seen with a large combination space.
+        const bound = computeCollisionBound(100, 100, 5);
+
+        expect(bound).toBeGreaterThan(25);
+        expect(bound).toBeLessThan(70);
+    });
+
+    it('should increase as the number of available combinations decreases', () => {
+        const draws = 500;
+        const trials = 5;
+
+        const boundManyCombos = computeCollisionBound(1_000_000, draws, trials);
+        const boundFewCombos = computeCollisionBound(1_000, draws, trials);
+
+        expect(boundFewCombos).toBeGreaterThan(boundManyCombos);
+    });
+
+    it('should match a manually-verified value for small, known inputs', () => {
+        // combinations=10, draws=5, trials=100, manually verified against the
+        // occupancy-problem mean/variance formulas used by the implementation
+        // (expected result is approximately 22.6%).
+        const bound = computeCollisionBound(10, 5, 100);
+
+        expect(bound).toBeGreaterThan(20);
+        expect(bound).toBeLessThan(25);
+    });
+
+    it('should produce a sane, bounded threshold for the real ID_SPACE_SIZE with 10,000 draws', () => {
+        const bound = computeCollisionBound(ID_SPACE_SIZE, 10000, 5);
+
+        expect(bound).toBeGreaterThan(0);
+        expect(bound).toBeLessThan(100);
+    });
+});
+
+/**
  * Create a temporary directory for tests
  */
 async function createTempDir(): Promise<string> {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pulse-perf-'));
     return tempDir;
-}
-
-/**
- * Compute 99.9th-percentile upper bound for collision rate using occupancy math.
- * Uses z-score of 3.09 (99.9th percentile) for a statistically justified bound.
- *
- * Model: throw n balls uniformly at random into N buckets (ID space size).
- * Let O be the number of occupied buckets. Then:
- *   - P(a specific bucket is empty)   = (1 - 1/N)^n
- *   - P(a specific bucket is occupied)= 1 - (1 - 1/N)^n
- *   - P(two specific buckets both occupied)
- *       = 1 - 2*(1 - 1/N)^n + (1 - 2/N)^n
- *   - E[O]  = N * P(occupied)
- *   - Var(O)= N * p*(1 - p) + N*(N - 1)*(p11 - p^2)
- *
- * Collisions C are given by C = n - O, so Var(C) = Var(O).
- * The collision rate is C/n, whose variance is Var(O) / n^2.
- * We return E[C]/n + z * sqrt(Var(C/n)) as an upper bound.
- */
-function computeCollisionBound(n: number, N: number, z = 3.09): number {
-    if (n <= 0 || N <= 0) {
-        return 0;
-    }
-
-    // Occupancy probabilities
-    const p0 = Math.pow(1 - 1 / N, n);         // bucket empty
-    const p1 = 1 - p0;                         // bucket occupied
-    const p00 = Math.pow(1 - 2 / N, n);        // two specific buckets both empty
-    const p11 = 1 - 2 * p0 + p00;              // two specific buckets both occupied
-
-    // Expected number of occupied buckets and its variance
-    const expectedOccupied = N * p1;
-    const varOccupied =
-        N * p1 * (1 - p1) +                    // sum Var(I_i)
-        N * (N - 1) * (p11 - p1 * p1);         // sum_{i≠j} Cov(I_i, I_j)
-
-    // Convert to expected collisions and collision-rate variance
-    const expectedCollisions = n - expectedOccupied;
-    const expectedRate = expectedCollisions / n;
-    const varianceRate = Math.max(varOccupied, 0) / (n * n);
-    const sigma = Math.sqrt(varianceRate);
-    return expectedRate + z * sigma;
 }
 
 /**
@@ -137,9 +211,10 @@ describe('Performance: ID Generation', () => {
 
         it('should have collision rate below the computed 99.9th-percentile bound for 10,000 iterations', () => {
             const iterations = 10000;
+            const COMBINATIONS = ID_SPACE_SIZE; // derived from actual word lists in id.ts
             const TRIALS = 5;
-            let totalCollisionRate = 0;
 
+            let totalCollisionRate = 0;
             for (let t = 0; t < TRIALS; t++) {
                 const ids = new Set<string>();
                 for (let i = 0; i < iterations; i++) {
@@ -148,16 +223,17 @@ describe('Performance: ID Generation', () => {
                 const collisions = iterations - ids.size;
                 totalCollisionRate += (collisions / iterations) * 100;
             }
-
             const meanCollisionRate = totalCollisionRate / TRIALS;
-            const bound = computeCollisionBound(iterations, ID_SPACE_SIZE) * 100;
 
-            // Mean collision rate across trials must not exceed the 99.9th-percentile bound
-            expect(meanCollisionRate).toBeLessThan(bound);
+            // Statistically justified upper bound: 99.9th-percentile of the
+            // sampling distribution of the mean collision rate over TRIALS trials
+            const computedThreshold = computeCollisionBound(COMBINATIONS, iterations, TRIALS);
+
+            expect(meanCollisionRate).toBeLessThan(computedThreshold);
 
             // Log metrics
-            console.log(`  ✓ Mean collision rate over ${TRIALS} trials: ${meanCollisionRate.toFixed(2)}% (bound: ${bound.toFixed(2)}%)`);
-            console.log(`  ✓ ID space size: ${ID_SPACE_SIZE.toLocaleString()}`);
+            console.log(`  ✓ Mean collision rate over ${TRIALS} trials: ${meanCollisionRate.toFixed(2)}%`);
+            console.log(`  ✓ Statistical threshold (99.9th pct): ${computedThreshold.toFixed(2)}%`);
         });
 
         it('should have <1% collision rate with 1,000 iterations', () => {
