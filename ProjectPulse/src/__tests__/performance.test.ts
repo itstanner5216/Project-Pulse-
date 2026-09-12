@@ -62,6 +62,10 @@ function getMemoryUsageMB(): number {
  * @returns Upper-bound collision rate percentage (0–100)
  */
 function computeCollisionBound(combinations: number, draws: number, trials: number): number {
+    if (combinations <= 0 || draws <= 0 || trials <= 0) {
+        return 0;
+    }
+
     // Expected number of unique IDs per trial (occupancy problem)
     const expectedUnique = combinations * (1 - Math.pow((combinations - 1) / combinations, draws));
     const expectedRate = ((draws - expectedUnique) / draws) * 100;
@@ -71,7 +75,7 @@ function computeCollisionBound(combinations: number, draws: number, trials: numb
     const a = Math.pow(1 - 1 / combinations, draws);
     const b = Math.pow(1 - 2 / combinations, draws);
     const varU = combinations * a * (1 - a) + combinations * (combinations - 1) * (b - a * a);
-    const stdRate = (Math.sqrt(varU) / draws) * 100;
+    const stdRate = (Math.sqrt(Math.max(0, varU)) / draws) * 100;
     // 99.9th-percentile z-score; mean of T trials has std = stdRate / sqrt(T)
     const z999 = 3.09;
     return expectedRate + z999 * (stdRate / Math.sqrt(trials));
@@ -82,6 +86,16 @@ function computeCollisionBound(combinations: number, draws: number, trials: numb
 // ============================================================================
 
 describe('computeCollisionBound (statistical helper)', () => {
+    it('should return zero for non-positive inputs', () => {
+        expect(computeCollisionBound(0, 100, 5)).toBe(0);
+        expect(computeCollisionBound(1000, 0, 5)).toBe(0);
+        expect(computeCollisionBound(1000, 100, 0)).toBe(0);
+    });
+
+    it('should remain finite when floating-point rounding makes the variance negative', () => {
+        expect(Number.isFinite(computeCollisionBound(10_000_000, 100, 5))).toBe(true);
+    });
+
     it('should return a value greater than or equal to the raw expected collision rate', () => {
         const combinations = 1000;
         const draws = 100;
@@ -213,27 +227,38 @@ describe('Performance: ID Generation', () => {
             const iterations = 10000;
             const COMBINATIONS = ID_SPACE_SIZE; // derived from actual word lists in id.ts
             const TRIALS = 5;
+            let state = 0x9e3779b9;
+            const randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => {
+                state ^= state << 13;
+                state ^= state >>> 17;
+                state ^= state << 5;
+                return (state >>> 0) / 0x100000000;
+            });
 
-            let totalCollisionRate = 0;
-            for (let t = 0; t < TRIALS; t++) {
-                const ids = new Set<string>();
-                for (let i = 0; i < iterations; i++) {
-                    ids.add(generateId());
+            try {
+                let totalCollisionRate = 0;
+                for (let t = 0; t < TRIALS; t++) {
+                    const ids = new Set<string>();
+                    for (let i = 0; i < iterations; i++) {
+                        ids.add(generateId());
+                    }
+                    const collisions = iterations - ids.size;
+                    totalCollisionRate += (collisions / iterations) * 100;
                 }
-                const collisions = iterations - ids.size;
-                totalCollisionRate += (collisions / iterations) * 100;
+                const meanCollisionRate = totalCollisionRate / TRIALS;
+
+                // Statistically justified upper bound: 99.9th-percentile of the
+                // sampling distribution of the mean collision rate over TRIALS trials
+                const computedThreshold = computeCollisionBound(COMBINATIONS, iterations, TRIALS);
+
+                expect(meanCollisionRate).toBeLessThan(computedThreshold);
+
+                // Log metrics
+                console.log(`  ✓ Mean collision rate over ${TRIALS} trials: ${meanCollisionRate.toFixed(2)}%`);
+                console.log(`  ✓ Statistical threshold (99.9th pct): ${computedThreshold.toFixed(2)}%`);
+            } finally {
+                randomSpy.mockRestore();
             }
-            const meanCollisionRate = totalCollisionRate / TRIALS;
-
-            // Statistically justified upper bound: 99.9th-percentile of the
-            // sampling distribution of the mean collision rate over TRIALS trials
-            const computedThreshold = computeCollisionBound(COMBINATIONS, iterations, TRIALS);
-
-            expect(meanCollisionRate).toBeLessThan(computedThreshold);
-
-            // Log metrics
-            console.log(`  ✓ Mean collision rate over ${TRIALS} trials: ${meanCollisionRate.toFixed(2)}%`);
-            console.log(`  ✓ Statistical threshold (99.9th pct): ${computedThreshold.toFixed(2)}%`);
         });
 
         it('should have <1% collision rate with 1,000 iterations', () => {
