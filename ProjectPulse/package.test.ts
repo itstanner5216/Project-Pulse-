@@ -37,6 +37,6 @@ describe('package.json overrides', () => {
     it('should not remove other expected package.json fields', () => {
         expect(packageJson.name).toBe('projectpulse');
         expect(packageJson.scripts.test).toBe('vitest');
-        expect(packageJson.engines.node).toBe('>=18.0.0');
+        expect(packageJson.engines.node).toBe('>=18.18.0');
     });
 });
