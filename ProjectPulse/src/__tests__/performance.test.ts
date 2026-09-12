@@ -9,7 +9,7 @@
  * 
  * Performance Targets:
  * - ID generation: >10,000 IDs/second
- * - ID collision rate (generateId): <5% with 10K iterations
+ * - ID collision rate (generateId): below computed 99.9th-percentile occupancy bound with 10K iterations
  * - ID collision rate (generateUniqueId): <0.01% with 100K iterations
  * - File watcher pickup time: <100ms for new requests
  * - Memory overhead: <5MB for various operations
@@ -76,6 +76,93 @@ function computeCollisionBound(combinations: number, draws: number, trials: numb
     const z999 = 3.09;
     return expectedRate + z999 * (stdRate / Math.sqrt(trials));
 }
+
+// ============================================================================
+// computeCollisionBound Helper Tests
+// ============================================================================
+
+describe('computeCollisionBound (statistical helper)', () => {
+    it('should return a value greater than or equal to the raw expected collision rate', () => {
+        const combinations = 1000;
+        const draws = 100;
+        const a = Math.pow(1 - 1 / combinations, draws);
+        const expectedUnique = combinations * (1 - a);
+        const expectedRate = ((draws - expectedUnique) / draws) * 100;
+
+        const bound = computeCollisionBound(combinations, draws, 10);
+
+        // The bound adds a non-negative z-score margin on top of the raw
+        // expected rate, so it must never be smaller than the raw rate.
+        expect(bound).toBeGreaterThanOrEqual(expectedRate);
+    });
+
+    it('should tighten (decrease) as the number of trials increases', () => {
+        const combinations = 5000;
+        const draws = 200;
+
+        const boundFewTrials = computeCollisionBound(combinations, draws, 1);
+        const boundManyTrials = computeCollisionBound(combinations, draws, 100);
+
+        expect(boundManyTrials).toBeLessThan(boundFewTrials);
+    });
+
+    it('should approach the raw expected collision rate as trials grows very large', () => {
+        const combinations = 5000;
+        const draws = 200;
+        const a = Math.pow(1 - 1 / combinations, draws);
+        const expectedUnique = combinations * (1 - a);
+        const expectedRate = ((draws - expectedUnique) / draws) * 100;
+
+        const boundHugeTrials = computeCollisionBound(combinations, draws, 1_000_000);
+
+        // With enormous trial counts, the z-score margin shrinks toward zero.
+        expect(boundHugeTrials).toBeCloseTo(expectedRate, 1);
+    });
+
+    it('should predict a near-zero collision rate when combinations vastly exceed draws', () => {
+        const bound = computeCollisionBound(1_000_000, 100, 5);
+
+        expect(bound).toBeGreaterThanOrEqual(0);
+        expect(bound).toBeLessThan(1);
+    });
+
+    it('should predict a substantial collision rate when draws saturate the combination space', () => {
+        // Classic occupancy problem: drawing N times from N slots leaves
+        // roughly 1/e of slots empty, so the expected collision rate is
+        // well above what would be seen with a large combination space.
+        const bound = computeCollisionBound(100, 100, 5);
+
+        expect(bound).toBeGreaterThan(25);
+        expect(bound).toBeLessThan(70);
+    });
+
+    it('should increase as the number of available combinations decreases', () => {
+        const draws = 500;
+        const trials = 5;
+
+        const boundManyCombos = computeCollisionBound(1_000_000, draws, trials);
+        const boundFewCombos = computeCollisionBound(1_000, draws, trials);
+
+        expect(boundFewCombos).toBeGreaterThan(boundManyCombos);
+    });
+
+    it('should match a manually-verified value for small, known inputs', () => {
+        // combinations=10, draws=5, trials=100, manually verified against the
+        // occupancy-problem mean/variance formulas used by the implementation
+        // (expected result is approximately 22.6%).
+        const bound = computeCollisionBound(10, 5, 100);
+
+        expect(bound).toBeGreaterThan(20);
+        expect(bound).toBeLessThan(25);
+    });
+
+    it('should produce a sane, bounded threshold for the real ID_SPACE_SIZE with 10,000 draws', () => {
+        const bound = computeCollisionBound(ID_SPACE_SIZE, 10000, 5);
+
+        expect(bound).toBeGreaterThan(0);
+        expect(bound).toBeLessThan(100);
+    });
+});
 
 /**
  * Create a temporary directory for tests
