@@ -305,14 +305,27 @@ describe('ID_SPACE_SIZE', () => {
         expect(expectedCollisions).toBeLessThan(draws * 0.05);
     });
 
-    it('should be consistent with the empirically observed generateId() output space', () => {
-        // Every generated ID must be composed of exactly 3 valid words, so the
-        // number of distinct IDs actually producible cannot exceed ID_SPACE_SIZE.
-        const seen = new Set<string>();
-        for (let i = 0; i < 5000; i++) {
-            seen.add(generateId());
+    it('should generate valid IDs across the picker boundaries', () => {
+        const randomSpy = vi.spyOn(Math, 'random')
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0.999999)
+            .mockReturnValueOnce(0.999999)
+            .mockReturnValueOnce(0.999999);
+
+        try {
+            const firstId = generateId();
+            const lastId = generateId();
+
+            expect(firstId).toBe('swift-amber-ant');
+            expect(lastId).toBe('vivid-violet-zebra');
+            expect(isValidId(firstId)).toBe(true);
+            expect(isValidId(lastId)).toBe(true);
+            expect(firstId).not.toBe(lastId);
+        } finally {
+            randomSpy.mockRestore();
         }
-        expect(seen.size).toBeLessThanOrEqual(ID_SPACE_SIZE);
     });
 });
 
